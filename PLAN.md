@@ -199,8 +199,8 @@ testing with the two-account harness.
 
 ```json
 {
-  "server": "http://127.0.0.1:18080",
-  "allow_insecure": true,
+  "server": "https://xenonlive.wivision.ca",
+  "allow_insecure": false,
   "titles": [
     { "title_id": "58410b00", "name": "Dead Rising 2: Case West",
       "exe": "/home/.../Dead_Rising_2_Case_West_Xenon_Recomp/runtime/build/cw_runtime",

@@ -30,10 +30,13 @@ struct TitleEntry {
 };
 
 struct Config {
-    std::string server = "http://127.0.0.1:18080";
+    // The public server. It has a real certificate, so the system trust
+    // store verifies it and no XLIVE_CA_FILE is needed. A dev server is
+    // "http://127.0.0.1:18080" with allow_insecure on.
+    std::string server = "https://xenonlive.wivision.ca";
     // Sets XLIVE_ALLOW_INSECURE=1 for the launcher and every title it
     // starts: plain http and no certificate check. Local development only.
-    bool allow_insecure = true;
+    bool allow_insecure = false;
     // An optional TTF for a font with accents or CJK; empty means ImGui's
     // built-in ProggyClean, which is ASCII only.
     std::string font_path;

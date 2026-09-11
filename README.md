@@ -146,8 +146,8 @@ would write its refreshed tokens back over the new one.
 
 ```json
 {
-  "server": "http://127.0.0.1:18080",
-  "allow_insecure": true,
+  "server": "https://xenonlive.wivision.ca",
+  "allow_insecure": false,
   "titles": [
     {
       "key": "case_west",
@@ -162,9 +162,11 @@ would write its refreshed tokens back over the new one.
 }
 ```
 
-`allow_insecure` sets `XLIVE_ALLOW_INSECURE=1` for the launcher and for every
-title it starts — plain http, no certificate check — and is for a local
-development server only.
+`server` defaults to the public server, `https://xenonlive.wivision.ca`,
+whose certificate the system trust store already accepts. `allow_insecure`
+sets `XLIVE_ALLOW_INSECURE=1` for the launcher and for every title it starts
+— plain http, no certificate check — and is for a local development server
+only (`"server": "http://127.0.0.1:18080", "allow_insecure": true`).
 
 A title is started with the launcher's environment plus its `env` on top. The
 shipped `cw_defaults.env` / `cz_defaults.env` already turn the renderer and
