@@ -21,6 +21,7 @@ cp "$SRC"/imgui.cpp "$SRC"/imgui.h "$SRC"/imgui_demo.cpp "$SRC"/imgui_draw.cpp \
    "$SRC"/imstb_rectpack.h "$SRC"/imstb_textedit.h "$SRC"/imstb_truetype.h \
    "$SRC"/imconfig.h "$SRC"/LICENSE.txt "$DEST/"
 cp "$SRC"/backends/imgui_impl_sdl2.cpp "$SRC"/backends/imgui_impl_sdl2.h \
+   "$SRC"/backends/imgui_impl_vulkan.cpp "$SRC"/backends/imgui_impl_vulkan.h \
    "$SRC"/backends/imgui_impl_sdlrenderer2.cpp "$SRC"/backends/imgui_impl_sdlrenderer2.h \
    "$DEST/backends/"
 echo "Dear ImGui $VERSION vendored into $DEST"

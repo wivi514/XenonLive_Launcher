@@ -59,6 +59,29 @@ The launcher stays open while the game runs. That is deliberate: it is what
 keeps the player "online" between games, and the server's presence logic
 counts on a player having a launcher and a game connected at once.
 
+## The in-game overlay
+
+`overlay/` is a second product of this repo: a static library a port links
+to get a Steam-style overlay inside the game — **Shift+Tab** (or **Back+Start**
+on a pad) opens a panel over the running title with the friends list
+(presence, *Invite*), the invitation inbox (*Accept* / *Decline*) and
+notifications that show even while it is closed: an invitation arriving,
+a friend coming online, an achievement unlocking.
+
+It draws with Dear ImGui through the Vulkan backend straight onto the port's
+swapchain image, right before present, using dynamic rendering — no render
+pass or pipeline of the port's is touched — and reads everything from the
+game's own `libxlive` client. Case West links it (`CW_XLIVE_OVERLAY`, on by
+default when this checkout is beside the port); the port's side is a dozen
+lines: forward SDL events and libxlive events, gate the game's input while
+the overlay is open, one call in the swapchain blit. `CW_XLIVE_OVERLAY=0`
+turns it off at runtime.
+
+Accepting an invitation in the overlay tells the server, which tells the same
+game (`invite_taken`), and the port joins exactly as it does when the launcher
+accepted — with the overlay built, the port no longer takes an invitation on
+the player's behalf.
+
 ## Games
 
 The launcher installs the XenonRecomp ports from their public releases:
@@ -177,7 +200,7 @@ With `SDL_VIDEODRIVER=offscreen` the whole thing runs without a display.
 ## Not in v1, on purpose
 
 Leaderboards, gamerpics, a friend's profile page, settings
-beyond the server URL, the in-game overlay, Windows packaging, the Steam Deck
+beyond the server URL, Windows packaging, the Steam Deck
 tarball (the AppImage runs there too). Each is a tab or a file later; none
 changes the shape of what is here. `launch.cpp` has the `CreateProcessW`
 path and `archive.cpp` the zip path already; the zip path is tested here
@@ -187,7 +210,8 @@ against the real Windows bundle, but neither has been built on Windows.
 
 ```
 CMakeLists.txt
-thirdparty/imgui/        Dear ImGui 1.91.9b, the files this build uses
+overlay/                 the in-game overlay library (xlive::overlay), linked by the ports
+thirdparty/imgui/        Dear ImGui 1.91.9b, the files this build uses (SDL_Renderer2 and Vulkan backends)
 thirdparty/miniz/        miniz 3.0.2
 thirdparty/stb/          stb_image.h 2.30
 src/
