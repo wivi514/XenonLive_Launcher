@@ -31,7 +31,10 @@ A single window with a rail of tabs:
 
 - **Sign in** — gamertag, password, *Sign in* or *Register*, and the server
   URL. A failure shows the server's own code (`bad_credentials`, `taken`).
-  Nothing is remembered but the server; `libxlive` keeps the tokens.
+  Above the form, the **saved accounts**: every account this machine has
+  signed into, with *Use* (no password) and *Forget*. *Switch account* on the
+  Home card does the same while signed in, and *Add another account* brings
+  the form back without signing out.
 - **Home** — the account card, and the **Games**: every port the launcher
   knows, with *Install*, *Update to vX*, *Play*, the release notes, and
   where to put your game. Releases come from the ports' GitHub release
@@ -99,6 +102,19 @@ under `<that>/games`):
 | `session.json` | the tokens and the server, written by the launcher and read by every game |
 | `launcher.json` | this launcher's config: server, installed games |
 | `launcher/` | the launcher's own cache, kept apart from a game's files in the same directory |
+| `launcher/accounts/<xuid>.json` | one saved account each: gamertag, server, tokens |
+
+Saved accounts are how one machine holds several gamertags. The game only
+ever reads `session.json`, so switching is: the active account's latest
+tokens are saved (the library rotates them whenever it refreshes, and the
+saved copy follows), the chosen account's tokens are written over
+`session.json`, and the client restarts as that account. The server is not
+told — a switch is not a sign-out, and the account you left stays signed in
+and usable. *Sign out* does tell the server, which revokes that account's
+tokens; the entry keeps its name and asks for the password next time.
+*Forget* removes the entry. A switch is refused while a game started from
+the launcher is running: that game holds the current account's session and
+would write its refreshed tokens back over the new one.
 
 `launcher.json`, as the launcher writes it after installing Case West:
 
@@ -150,6 +166,7 @@ screen (the acceptance run in `PLAN.md` uses them):
 | `XENONLIVE_PLAY=1` | presses Play on the first title once signed in |
 | `XENONLIVE_ACCEPT=1` | presses Accept on the first invitation in the inbox |
 | `XENONLIVE_INSTALL=case_west` | presses Install on that game |
+| `XENONLIVE_SWITCH=<xuid hex>` | presses Use on that saved account |
 | `XENONLIVE_SCREENSHOT_MS=5000` | takes the screenshot later than two seconds |
 
 With `SDL_VIDEODRIVER=offscreen` the whole thing runs without a display.
@@ -172,6 +189,7 @@ thirdparty/miniz/        miniz 3.0.2
 src/
   main.cpp               SDL2 window + SDL_Renderer, the ImGui frame loop
   app.h / app.cpp        the client, its event queue, the tickets, the game
+  accounts.h / .cpp      saved accounts and the session.json switch
   config.h / config.cpp  launcher.json
   catalog.h / .cpp       the games the launcher can install
   installer.h / .cpp     GitHub release lookup, download, SHA-256 check, install

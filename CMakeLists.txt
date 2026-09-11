@@ -53,6 +53,7 @@ target_compile_options(miniz PRIVATE -w)
 add_executable(xenonlive_launcher
     src/main.cpp
     src/app.cpp
+    src/accounts.cpp
     src/config.cpp
     src/launch.cpp
     src/toasts.cpp

@@ -54,6 +54,7 @@ bool App::Init(std::string& error) {
     // set before Start() — and inherited by every title launched from here.
     if (config.allow_insecure) SetEnv("XLIVE_ALLOW_INSECURE", "1");
 
+    accounts.Open(DataDir() / "launcher", DataDir() / "session.json");
     StartClient();
     if (!client) {
         error = "the XenonLive client could not start";
@@ -103,6 +104,49 @@ void App::RestartClient() {
 void App::SaveConfigOrToast() {
     std::string error;
     if (!SaveConfig(config, error)) toasts.Push("Could not save launcher.json: " + error);
+}
+
+// -- saved accounts -----------------------------------------------------------
+
+bool App::SwitchAccount(uint64_t xuid, std::string& error) {
+    const SavedAccount* chosen = accounts.Find(xuid);
+    if (!chosen || !chosen->has_tokens()) {
+        error = "that account needs its password again";
+        return false;
+    }
+    if (game.running()) {
+        error = "quit the running game first: it holds the current account's session";
+        return false;
+    }
+    // The current account's latest tokens, before its file is replaced.
+    if (client && signed_in() && signin.ticket == 0) accounts.Sync(client->identity().xuid);
+    if (!accounts.WriteSession(*chosen)) {
+        error = "could not write session.json";
+        return false;
+    }
+    if (!chosen->server.empty() && chosen->server != config.server) {
+        config.server = chosen->server;
+        std::snprintf(signin.server, sizeof(signin.server), "%s", config.server.c_str());
+        SaveConfigOrToast();
+    }
+    adding_account = false;
+    StartClient();
+    return true;
+}
+
+void App::SignOut() {
+    if (!client) return;
+    if (signed_in()) accounts.ClearTokens(client->identity().xuid);
+    adding_account = false;
+    client->SignOut();
+}
+
+void App::ForgetAccount(uint64_t xuid) {
+    if (client && signed_in() && client->identity().xuid == xuid) {
+        adding_account = false;
+        client->SignOut();
+    }
+    accounts.Forget(xuid);
 }
 
 bool App::signed_in() const {
@@ -183,6 +227,7 @@ void App::PollPending() {
             if (status == xlive::Client::OpStatus::Succeeded) {
                 signin.error.clear();
                 std::memset(signin.password, 0, sizeof(signin.password));
+                adding_account = false;
             } else {
                 signin.error = result.error.empty() ? "unknown" : result.error;
             }
@@ -534,7 +579,28 @@ void App::Frame() {
     ImGui::Begin("XenonLive", nullptr, flags);
     ImGui::PopStyleVar(2);
 
-    const bool show_signin = !signed_in() || signin.ticket != 0;
+    // The active account's saved copy follows session.json — the library
+    // rotates the tokens in it — except while a sign-in is in flight, when
+    // the file already holds the NEXT account's tokens and the identity has
+    // not caught up yet.
+    if (client && signed_in() && signin.ticket == 0) {
+        const xlive::Identity id = client->identity();
+        if (!accounts.Find(id.xuid)) {
+            // First time this account is seen from here: a fresh sign-in,
+            // or a session.json from before saved accounts existed.
+            SavedAccount fresh;
+            if (accounts.ReadSession(fresh)) {
+                fresh.xuid = id.xuid;
+                fresh.gamertag = id.gamertag;
+                if (fresh.server.empty()) fresh.server = config.server;
+                accounts.Save(fresh);
+            }
+        } else {
+            accounts.Sync(id.xuid);
+        }
+    }
+
+    const bool show_signin = !signed_in() || signin.ticket != 0 || adding_account;
     if (show_signin) {
         DrawSignIn(*this);
     } else {

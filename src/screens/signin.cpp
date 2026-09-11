@@ -1,5 +1,6 @@
 // Sign in / register. Remembers nothing but the server URL; the library
 // keeps the tokens.
+#include <cstdio>
 #include <cstring>
 
 #include "app.h"
@@ -16,10 +17,63 @@ void DrawSignIn(App& app) {
 
     ImGui::BeginChild("signin", ImVec2(width, 0.0f), ImGuiChildFlags_AutoResizeY);
     ImGui::TextDisabled("XenonLive");
+    if (app.adding_account) {
+        ImGui::SameLine(width - 60.0f);
+        if (ImGui::SmallButton("Back")) app.adding_account = false;
+    }
     ImGui::Separator();
     ImGui::Spacing();
 
     const bool busy = app.signin.ticket != 0;
+
+    // -- saved accounts --------------------------------------------------------
+    // One row per account this machine has signed into. Use swaps its saved
+    // tokens in without a password; an account that was signed out keeps
+    // its name here and needs the password again.
+    const uint64_t current = app.signed_in() ? app.client->identity().xuid : 0;
+    bool any = false;
+    for (const SavedAccount& account : app.accounts.list()) {
+        if (account.xuid == current) continue;
+        any = true;
+    }
+    if (any) {
+        ImGui::TextUnformatted("Saved accounts");
+        uint64_t forget = 0;
+        for (const SavedAccount& account : app.accounts.list()) {
+            if (account.xuid == current) continue;
+            ImGui::PushID(int(account.xuid & 0x7FFFFFFF));
+            ImGui::PushID(int(account.xuid >> 32));
+            ImGui::BeginChild("acct", ImVec2(0.0f, 0.0f),
+                              ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+            ImGui::TextUnformatted(account.gamertag.c_str());
+            ImGui::SameLine(width - 150.0f);
+            ImGui::BeginDisabled(busy);
+            if (account.has_tokens()) {
+                if (ImGui::SmallButton("Use")) {
+                    std::string error;
+                    if (!app.SwitchAccount(account.xuid, error)) app.toasts.Push(error, 6.0);
+                }
+            } else {
+                if (ImGui::SmallButton("Password")) {
+                    std::snprintf(app.signin.gamertag, sizeof(app.signin.gamertag), "%s",
+                                  account.gamertag.c_str());
+                }
+            }
+            ImGui::SameLine();
+            if (ImGui::SmallButton("Forget")) forget = account.xuid;
+            ImGui::EndDisabled();
+            ImGui::EndChild();
+            ImGui::PopID();
+            ImGui::PopID();
+        }
+        if (forget != 0) app.ForgetAccount(forget);
+        ImGui::Spacing();
+        ImGui::TextUnformatted(app.adding_account ? "Add another account" : "Or sign in");
+        ImGui::Spacing();
+    } else if (app.adding_account) {
+        ImGui::TextUnformatted("Add another account");
+        ImGui::Spacing();
+    }
     ImGui::BeginDisabled(busy);
 
     ImGui::TextUnformatted("Server");

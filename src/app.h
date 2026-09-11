@@ -14,6 +14,7 @@
 #include <string>
 #include <vector>
 
+#include "accounts.h"
 #include "catalog.h"
 #include "config.h"
 #include "installer.h"
@@ -62,6 +63,19 @@ public:
     // Tears the client down and starts a fresh one against config.server.
     void RestartClient();
     void SaveConfigOrToast();
+
+    // -- saved accounts ----------------------------------------------------
+    Accounts accounts;
+    // The sign-in screen shown while already signed in, to add an account.
+    bool adding_account = false;
+    // Swaps the saved account's tokens into session.json and restarts the
+    // client. Refused while a game the launcher started is running: that
+    // game would write its own refreshed tokens back over the new ones.
+    bool SwitchAccount(uint64_t xuid, std::string& error);
+    // Sign out of the current account: its saved entry keeps the gamertag
+    // and loses the tokens (the server revokes them).
+    void SignOut();
+    void ForgetAccount(uint64_t xuid);
 
     struct SignInState {
         char server[256] = {};

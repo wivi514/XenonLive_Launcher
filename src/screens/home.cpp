@@ -160,8 +160,33 @@ void DrawHome(App& app) {
     ImGui::TextDisabled("%s", app.client->status().c_str());
     ImGui::TextDisabled("%s", app.client->gateway_connected() ? "live updates on"
                                                                : "live updates off");
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 70.0f);
-    if (ImGui::SmallButton("Sign out")) app.client->SignOut();
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 190.0f);
+    if (ImGui::SmallButton("Switch account")) ImGui::OpenPopup("switch");
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Sign out")) app.SignOut();
+    if (ImGui::BeginPopup("switch")) {
+        for (const SavedAccount& account : app.accounts.list()) {
+            if (account.xuid == id.xuid) continue;
+            const std::string label =
+                account.gamertag + (account.has_tokens() ? "" : "  (needs password)");
+            if (ImGui::Selectable(label.c_str())) {
+                if (account.has_tokens()) {
+                    std::string error;
+                    if (!app.SwitchAccount(account.xuid, error)) app.toasts.Push(error, 6.0);
+                } else {
+                    std::snprintf(app.signin.gamertag, sizeof(app.signin.gamertag), "%s",
+                                  account.gamertag.c_str());
+                    app.adding_account = true;
+                }
+            }
+        }
+        if (app.accounts.list().size() > 1) ImGui::Separator();
+        if (ImGui::Selectable("Add another account...")) {
+            app.signin.gamertag[0] = '\0';
+            app.adding_account = true;
+        }
+        ImGui::EndPopup();
+    }
     ImGui::EndChild();
 
     if (!app.config_error.empty()) {

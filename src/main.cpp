@@ -59,8 +59,9 @@ void LoadFont(ImGuiIO& io, const launcher::Config& config) {
 // picks the starting tab; XENONLIVE_PLAY=1 presses Play on the first title
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
 // in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
-// XENONLIVE_SCREENSHOT_MS moves the screenshot later than two seconds. None
-// does anything unless set.
+// XENONLIVE_SCREENSHOT_MS moves the screenshot later than two seconds;
+// XENONLIVE_SWITCH=<xuid hex> presses Use on that saved account. None does
+// anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
     SDL_GetRendererOutputSize(renderer, &w, &h);
@@ -131,6 +132,7 @@ int main(int, char**) {
     const Uint32 screenshot_at =
         SDL_GetTicks() + (screenshot_ms ? Uint32(std::strtoul(screenshot_ms, nullptr, 10)) : 2000u);
     const char* install_key = std::getenv("XENONLIVE_INSTALL");
+    const char* switch_xuid = std::getenv("XENONLIVE_SWITCH");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -158,6 +160,13 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
         app.Frame();
+        if (switch_xuid && app.client) {
+            std::string switch_error;
+            if (!app.SwitchAccount(std::strtoull(switch_xuid, nullptr, 16), switch_error)) {
+                std::fprintf(stderr, "[launcher] XENONLIVE_SWITCH: %s\n", switch_error.c_str());
+            }
+            switch_xuid = nullptr;
+        }
         if (install_key && app.signed_in()) {
             if (const launcher::CatalogGame* game = launcher::CatalogByKey(install_key)) {
                 app.InstallGame(*game);
