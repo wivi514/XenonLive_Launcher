@@ -35,6 +35,9 @@ void ApplyStyle(ImGuiStyle& style) {
     style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.20f, 0.22f, 0.24f, 1.0f);
     style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.24f, 0.26f, 0.28f, 1.0f);
     style.Colors[ImGuiCol_SeparatorHovered] = style.Colors[ImGuiCol_Separator];
+    style.Colors[ImGuiCol_Header] = ImVec4(0.16f, 0.17f, 0.19f, 1.0f);
+    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.20f, 0.22f, 0.24f, 1.0f);
+    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.24f, 0.26f, 0.28f, 1.0f);
 }
 
 // ImGui's built-in ProggyClean has no accents or CJK. Gamertags are ASCII

@@ -29,11 +29,15 @@ struct TitleEntry {
     bool managed() const { return !key.empty(); }
 };
 
+// The public server. It has a real certificate, so the system trust store
+// verifies it and no XLIVE_CA_FILE is needed. A player never types this: the
+// launcher and the games it starts talk to it unless launcher.json says
+// otherwise — a self-hosted server, or the dev one ("http://127.0.0.1:18080"
+// with allow_insecure on).
+inline constexpr const char* kDefaultServer = "https://xenonlive.wivision.ca";
+
 struct Config {
-    // The public server. It has a real certificate, so the system trust
-    // store verifies it and no XLIVE_CA_FILE is needed. A dev server is
-    // "http://127.0.0.1:18080" with allow_insecure on.
-    std::string server = "https://xenonlive.wivision.ca";
+    std::string server = kDefaultServer;
     // Sets XLIVE_ALLOW_INSECURE=1 for the launcher and every title it
     // starts: plain http and no certificate check. Local development only.
     bool allow_insecure = false;

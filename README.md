@@ -29,12 +29,14 @@ pinned archives and checks their hashes.
 
 A single window with a rail of tabs:
 
-- **Sign in** — gamertag, password, *Sign in* or *Register*, and the server
-  URL. A failure shows the server's own code (`bad_credentials`, `taken`).
-  Above the form, the **saved accounts**: every account this machine has
-  signed into, with *Use* (no password) and *Forget*. *Switch account* on the
-  Home card does the same while signed in, and *Add another account* brings
-  the form back without signing out.
+- **Sign in** — gamertag, password, *Sign in* or *Register*. That is all a
+  player types: the launcher talks to `https://xenonlive.wivision.ca` and the
+  games it starts follow it. A failure shows the server's own code
+  (`bad_credentials`, `taken`). Above the form, the **saved accounts**: every
+  account this machine has signed into, with *Use* (no password) and
+  *Forget*. *Switch account* on the Home card does the same while signed in,
+  and *Add another account* brings the form back without signing out. A
+  self-hoster or a developer finds the server under *Advanced: server*.
 - **Home** — the account card, and the **Games**: every port the launcher
   knows, with *Install*, *Update to vX*, *Play*, the release notes, and
   where to put your game. Releases come from the ports' GitHub release

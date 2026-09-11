@@ -76,14 +76,6 @@ void DrawSignIn(App& app) {
     }
     ImGui::BeginDisabled(busy);
 
-    ImGui::TextUnformatted("Server");
-    ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputText("##server", app.signin.server, sizeof(app.signin.server));
-    if (app.client && std::string(app.signin.server) != app.config.server) {
-        ImGui::SameLine();
-        if (ImGui::SmallButton("Use")) app.RestartClient();
-    }
-
     ImGui::TextUnformatted("Gamertag");
     ImGui::SetNextItemWidth(-1.0f);
     ImGui::InputText("##gamertag", app.signin.gamertag, sizeof(app.signin.gamertag));
@@ -110,6 +102,30 @@ void DrawSignIn(App& app) {
     if (ImGui::Button("Register", ImVec2(-1.0f, 0.0f))) submit(true);
     ImGui::EndDisabled();
 
+    // The server, for a self-hoster or a developer. Everyone else never sees
+    // it: the default is the XenonLive server and the games follow it.
+    ImGui::Spacing();
+    if (ImGui::CollapsingHeader("Advanced: server")) {
+        ImGui::BeginDisabled(busy);
+        ImGui::SetNextItemWidth(-1.0f);
+        ImGui::InputText("##server", app.signin.server, sizeof(app.signin.server));
+        if (app.client && std::string(app.signin.server) != app.config.server) {
+            if (ImGui::SmallButton("Use this server")) app.RestartClient();
+            ImGui::SameLine();
+        }
+        if (std::string(app.signin.server) != kDefaultServer) {
+            if (ImGui::SmallButton("Back to the default")) {
+                std::snprintf(app.signin.server, sizeof(app.signin.server), "%s", kDefaultServer);
+                if (app.config.server != kDefaultServer) app.RestartClient();
+            }
+        }
+        if (app.config.allow_insecure) {
+            ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.35f, 1.0f),
+                               "allow_insecure is on in launcher.json: plain http, no certificate check");
+        }
+        ImGui::EndDisabled();
+    }
+
     ImGui::Spacing();
     if (busy) {
         ImGui::TextDisabled(app.signin.registering ? "Registering..." : "Signing in...");
@@ -123,7 +139,7 @@ void DrawSignIn(App& app) {
         } else if (app.signin.error == "bad_password") {
             ImGui::TextWrapped("A password is at least 8 characters.");
         } else if (app.signin.error == "no_server") {
-            ImGui::TextWrapped("Enter a server URL and press Use.");
+            ImGui::TextWrapped("No server is configured: open Advanced and press Back to the default.");
         }
     } else if (app.client) {
         // What the library is doing with a saved session, if there is one:
