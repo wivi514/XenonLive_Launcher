@@ -54,16 +54,39 @@ void DrawAchievements(App& app) {
     const xlive::Client::TitleInfo& title = app.achievements.result.title;
     unsigned unlocked = 0;
     for (const auto& a : title.achievements) unlocked += a.unlocked;
+    if (const Image tile_image = app.images.Title(title.title_id); tile_image.texture) {
+        ImGui::Image(reinterpret_cast<ImTextureID>(tile_image.texture), ImVec2(48.0f, 48.0f));
+        ImGui::SameLine();
+    }
+    ImGui::BeginGroup();
     ImGui::Text("%s", title.name.c_str());
-    ImGui::SameLine();
     ImGui::TextDisabled("%u / %u G, %u of %zu unlocked", title.gamerscore, title.max_gamerscore,
                         unlocked, title.achievements.size());
+    ImGui::EndGroup();
     ImGui::Separator();
 
+    const float tile = 64.0f;
     for (const xlive::Client::Achievement& a : title.achievements) {
         ImGui::PushID(a.id);
         ImGui::BeginChild("ach", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         const bool secret = a.hidden && !a.unlocked;
+
+        // The tile, from the SPA's own art via the server. Locked ones are
+        // drawn dimmed; a secret one shows no art at all, which is what the
+        // console did. While the image has not arrived, an empty square
+        // holds the space so the text does not jump when it does.
+        const Image image = secret ? Image{} : app.images.Achievement(title.title_id, a.id);
+        if (image.texture) {
+            const ImVec4 tint = a.unlocked ? ImVec4(1, 1, 1, 1) : ImVec4(0.55f, 0.55f, 0.55f, 0.8f);
+            ImGui::ImageWithBg(reinterpret_cast<ImTextureID>(image.texture), ImVec2(tile, tile),
+                               ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), tint);
+        } else {
+            ImGui::Dummy(ImVec2(tile, tile));
+            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                                ImGui::GetColorU32(ImGuiCol_Border));
+        }
+        ImGui::SameLine();
+        ImGui::BeginGroup();
         if (a.unlocked) {
             ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "%s", a.name.c_str());
         } else {
@@ -80,6 +103,7 @@ void DrawAchievements(App& app) {
         } else {
             ImGui::TextDisabled("Continue playing to unlock this secret achievement.");
         }
+        ImGui::EndGroup();
         ImGui::EndChild();
         ImGui::PopID();
     }

@@ -86,6 +86,20 @@ void App::StartClient() {
         return;
     }
     client = std::move(fresh);
+    // Which saved account this session belongs to, before the identity is
+    // known: if the server ends it on the first exchange, the SigninChanged
+    // that follows must still know whose tokens died.
+    last_xuid_ = 0;
+    {
+        SavedAccount current;
+        if (accounts.ReadSession(current)) {
+            for (const SavedAccount& saved : accounts.list()) {
+                if (saved.has_tokens() && saved.refresh_token == current.refresh_token) {
+                    last_xuid_ = saved.xuid;
+                }
+            }
+        }
+    }
     last_friends_.clear();
     friends_baseline_ = false;
     friends = FriendsState{};
@@ -98,6 +112,7 @@ void App::StartClient() {
 void App::RestartClient() {
     config.server = signin.server;
     SaveConfigOrToast();
+    images.set_server(config.server);
     StartClient();
 }
 
@@ -128,6 +143,7 @@ bool App::SwitchAccount(uint64_t xuid, std::string& error) {
         config.server = chosen->server;
         std::snprintf(signin.server, sizeof(signin.server), "%s", config.server.c_str());
         SaveConfigOrToast();
+        images.set_server(config.server);
     }
     adding_account = false;
     StartClient();
@@ -472,11 +488,17 @@ void App::HandleEvent(const xlive::Event& event) {
         case EventKind::SigninChanged:
             if (signed_in()) {
                 toasts.Push("Signed in as " + gamertag());
+                last_xuid_ = client->identity().xuid;
                 // A friends tab opened before the identity was known asked
                 // about nobody; ask again now that there is someone.
                 if (tab == Tab::Friends) RefreshMyPresence();
             } else {
-                toasts.Push("Signed out");
+                // Either our own Sign out, or the server ending the session
+                // (a dead refresh token). The saved account keeps its name
+                // and loses the tokens either way.
+                if (last_xuid_ != 0) accounts.ClearTokens(last_xuid_);
+                last_xuid_ = 0;
+                toasts.Push("Signed out: " + client->status(), 6.0);
                 last_friends_.clear();
                 friends_baseline_ = false;
                 friends.mine = xlive::Client::Presence{};
@@ -585,6 +607,7 @@ void App::Frame() {
     // not caught up yet.
     if (client && signed_in() && signin.ticket == 0) {
         const xlive::Identity id = client->identity();
+        last_xuid_ = id.xuid;
         if (!accounts.Find(id.xuid)) {
             // First time this account is seen from here: a fresh sign-in,
             // or a session.json from before saved accounts existed.

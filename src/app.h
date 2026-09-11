@@ -17,6 +17,7 @@
 #include "accounts.h"
 #include "catalog.h"
 #include "config.h"
+#include "images.h"
 #include "installer.h"
 #include "launch.h"
 #include "toasts.h"
@@ -53,6 +54,9 @@ public:
     std::string config_error;
     std::unique_ptr<xlive::Client> client;
     Toasts toasts;
+    // Achievement and title tiles, from the server. Opened by main once the
+    // renderer exists.
+    ImageCache images;
     Tab tab = Tab::Home;
 
     // "We know who the player is" — the cached identity counts, so a saved
@@ -145,6 +149,9 @@ private:
     std::deque<xlive::Event> events_;
 
     std::vector<xlive::Client::Friend> last_friends_;
+    // Who was signed in at the last frame, so a SigninChanged that ends a
+    // session can name the saved account that lost its tokens.
+    uint64_t last_xuid_ = 0;
     bool friends_baseline_ = false;
     std::vector<PendingSocial> pending_;
     // Installs and checks, one at a time, in the order asked.

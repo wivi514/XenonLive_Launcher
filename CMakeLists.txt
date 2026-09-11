@@ -54,6 +54,7 @@ add_executable(xenonlive_launcher
     src/main.cpp
     src/app.cpp
     src/accounts.cpp
+    src/images.cpp
     src/config.cpp
     src/launch.cpp
     src/toasts.cpp
@@ -74,7 +75,11 @@ target_include_directories(xenonlive_launcher PRIVATE
     # launcher is the same project's code and there is no reason to carry a
     # second JSON parser next to one that is already linked in.
     ${XLIVE_ROOT}/client/src
+    # stb_image.h v2.30, the PNG decoder for the tiles.
+    ${CMAKE_CURRENT_SOURCE_DIR}/thirdparty/stb
 )
+# images.cpp instantiates stb_image, whose unused helpers are not ours.
+set_source_files_properties(src/images.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unused-function")
 target_compile_options(xenonlive_launcher PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wshadow>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>

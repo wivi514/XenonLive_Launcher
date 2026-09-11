@@ -19,8 +19,8 @@ Needs the XenonLive checkout beside this one (`~/GithubRepo/XenonLive`, or
     cmake --build build
     ./build/xenonlive_launcher
 
-Dear ImGui 1.91.9b and miniz 3.0.2 (the zip reader for the Windows bundle)
-are vendored under `thirdparty/` rather than fetched, for the same reason the
+Dear ImGui 1.91.9b, miniz 3.0.2 (the zip reader for the Windows bundle) and
+stb_image.h 2.30 (the PNG decoder for the tiles) are vendored under `thirdparty/` rather than fetched, for the same reason the
 ports vendor their dependencies: a checkout must still build in a decade. If
 the directory is ever lost, `tools/fetch_thirdparty.sh` re-creates it from the
 pinned archives and checks their hashes.
@@ -47,9 +47,11 @@ A single window with a rail of tabs:
   invitation names the session.
 - **Invites** — the inbox. *Accept* launches the title if it is not running;
   if it is, the server tells the running game and it joins from there.
-- **Achievements** — per configured title: name, the locked or unlocked
-  description, score, unlock date. Hidden ones read "Secret achievement" until
-  unlocked.
+- **Achievements** — per installed title: the tile, name, the locked or
+  unlocked description, score, unlock date. Locked tiles are dimmed; hidden
+  ones read "Secret achievement" with no art until unlocked. The art is the
+  SPA's own, served by the server and cached under `launcher/images/` since
+  it never changes.
 - **Toasts** — bottom right: a friend coming online or starting a game, a
   request, an invitation (with an *Accept* button), the connection changing.
 
@@ -103,6 +105,7 @@ under `<that>/games`):
 | `launcher.json` | this launcher's config: server, installed games |
 | `launcher/` | the launcher's own cache, kept apart from a game's files in the same directory |
 | `launcher/accounts/<xuid>.json` | one saved account each: gamertag, server, tokens |
+| `launcher/images/<title>/` | the title's tiles, fetched once |
 
 Saved accounts are how one machine holds several gamertags. The game only
 ever reads `session.json`, so switching is: the active account's latest
@@ -173,7 +176,7 @@ With `SDL_VIDEODRIVER=offscreen` the whole thing runs without a display.
 
 ## Not in v1, on purpose
 
-Leaderboards, gamerpics, achievement art, a friend's profile page, settings
+Leaderboards, gamerpics, a friend's profile page, settings
 beyond the server URL, the in-game overlay, Windows packaging, the Steam Deck
 tarball (the AppImage runs there too). Each is a tab or a file later; none
 changes the shape of what is here. `launch.cpp` has the `CreateProcessW`
@@ -186,10 +189,12 @@ against the real Windows bundle, but neither has been built on Windows.
 CMakeLists.txt
 thirdparty/imgui/        Dear ImGui 1.91.9b, the files this build uses
 thirdparty/miniz/        miniz 3.0.2
+thirdparty/stb/          stb_image.h 2.30
 src/
   main.cpp               SDL2 window + SDL_Renderer, the ImGui frame loop
   app.h / app.cpp        the client, its event queue, the tickets, the game
   accounts.h / .cpp      saved accounts and the session.json switch
+  images.h / .cpp        achievement and title tiles: fetch, cache, decode
   config.h / config.cpp  launcher.json
   catalog.h / .cpp       the games the launcher can install
   installer.h / .cpp     GitHub release lookup, download, SHA-256 check, install

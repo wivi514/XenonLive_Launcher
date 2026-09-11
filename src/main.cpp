@@ -124,6 +124,8 @@ int main(int, char**) {
         return 1;
     }
     LoadFont(io, app.config);
+    app.images.Open(renderer, launcher::DataDir() / "launcher");
+    app.images.set_server(app.config.server);
     app.tab = StartingTab();
     const char* screenshot = std::getenv("XENONLIVE_SCREENSHOT");
     bool play = std::getenv("XENONLIVE_PLAY") != nullptr;

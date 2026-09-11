@@ -48,6 +48,12 @@ void DrawGame(App& app, const CatalogGame& game) {
 
     ImGui::PushID(game.key);
     ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    // The title's tile, when the server has the title imported.
+    if (const Image tile = app.images.Title(game.title_id); tile.texture) {
+        ImGui::Image(reinterpret_cast<ImTextureID>(tile.texture), ImVec2(64.0f, 64.0f));
+        ImGui::SameLine();
+    }
+    ImGui::BeginGroup();
     ImGui::Text("%s", game.name);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TitleIdHex(game.title_id).c_str());
@@ -143,6 +149,7 @@ void DrawGame(App& app, const CatalogGame& game) {
         if (ImGui::SmallButton("Release notes")) SDL_OpenURL(page->second.c_str());
     }
     ImGui::EndDisabled();
+    ImGui::EndGroup();
 
     ImGui::EndChild();
     ImGui::PopID();

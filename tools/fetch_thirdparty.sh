@@ -1,5 +1,5 @@
 #!/bin/bash
-# Re-fetches the pinned third-party code into thirdparty/: Dear ImGui and miniz.
+# Re-fetches the pinned third-party code into thirdparty/: Dear ImGui, miniz, stb_image.
 # Only needed if thirdparty/ is ever lost; the checkout vendors these files.
 set -euo pipefail
 VERSION=1.91.9b
@@ -37,3 +37,14 @@ mkdir -p "$TMP/miniz" "$ROOT/thirdparty/miniz"
 python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$TMP/miniz.zip" "$TMP/miniz"
 cp "$TMP/miniz/miniz.c" "$TMP/miniz/miniz.h" "$TMP/miniz/LICENSE" "$ROOT/thirdparty/miniz/"
 echo "miniz $MINIZ_VERSION vendored into $ROOT/thirdparty/miniz"
+
+# stb_image.h v2.30 (public domain / MIT), the PNG decoder for achievement
+# tiles. Pinned to a commit of nothings/stb; the licence is at the end of the
+# file itself.
+STB_COMMIT=2c980bb59875b0d32144a71867fbdebb2f77cd20
+STB_SHA256=594c2fe35d49488b4382dbfaec8f98366defca819d916ac95becf3e75f4200b3
+mkdir -p "$ROOT/thirdparty/stb"
+curl -sSL -o "$TMP/stb_image.h" "https://raw.githubusercontent.com/nothings/stb/${STB_COMMIT}/stb_image.h"
+echo "$STB_SHA256  $TMP/stb_image.h" | sha256sum -c -
+cp "$TMP/stb_image.h" "$ROOT/thirdparty/stb/"
+echo "stb_image.h vendored into $ROOT/thirdparty/stb"
