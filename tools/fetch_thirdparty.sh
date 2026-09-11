@@ -1,5 +1,5 @@
 #!/bin/bash
-# Re-fetches the pinned Dear ImGui release into thirdparty/imgui.
+# Re-fetches the pinned third-party code into thirdparty/: Dear ImGui and miniz.
 # Only needed if thirdparty/ is ever lost; the checkout vendors these files.
 set -euo pipefail
 VERSION=1.91.9b
@@ -24,3 +24,16 @@ cp "$SRC"/backends/imgui_impl_sdl2.cpp "$SRC"/backends/imgui_impl_sdl2.h \
    "$SRC"/backends/imgui_impl_sdlrenderer2.cpp "$SRC"/backends/imgui_impl_sdlrenderer2.h \
    "$DEST/backends/"
 echo "Dear ImGui $VERSION vendored into $DEST"
+
+# miniz 3.0.2 (MIT), the zip reader the Windows install path uses. Same
+# reason it is vendored: the release zip format will not change, and neither
+# should the code that reads it.
+MINIZ_VERSION=3.0.2
+MINIZ_SHA256=ada38db0b703a56d3dd6d57bf84a9c5d664921d870d8fea4db153979fb5332c5
+curl -sSL -o "$TMP/miniz.zip" \
+    "https://github.com/richgel999/miniz/releases/download/${MINIZ_VERSION}/miniz-${MINIZ_VERSION}.zip"
+echo "$MINIZ_SHA256  $TMP/miniz.zip" | sha256sum -c -
+mkdir -p "$TMP/miniz" "$ROOT/thirdparty/miniz"
+python3 -c "import zipfile,sys; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$TMP/miniz.zip" "$TMP/miniz"
+cp "$TMP/miniz/miniz.c" "$TMP/miniz/miniz.h" "$TMP/miniz/LICENSE" "$ROOT/thirdparty/miniz/"
+echo "miniz $MINIZ_VERSION vendored into $ROOT/thirdparty/miniz"

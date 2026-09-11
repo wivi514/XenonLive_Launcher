@@ -19,10 +19,11 @@ Needs the XenonLive checkout beside this one (`~/GithubRepo/XenonLive`, or
     cmake --build build
     ./build/xenonlive_launcher
 
-Dear ImGui 1.91.9b is vendored under `thirdparty/imgui/` rather than fetched,
-for the same reason the ports vendor their dependencies: a checkout must still
-build in a decade. If the directory is ever lost, `tools/fetch_imgui.sh`
-re-creates it from the pinned tarball and checks its hash.
+Dear ImGui 1.91.9b and miniz 3.0.2 (the zip reader for the Windows bundle)
+are vendored under `thirdparty/` rather than fetched, for the same reason the
+ports vendor their dependencies: a checkout must still build in a decade. If
+the directory is ever lost, `tools/fetch_thirdparty.sh` re-creates it from the
+pinned archives and checks their hashes.
 
 ## What it does
 
@@ -31,8 +32,11 @@ A single window with a rail of tabs:
 - **Sign in** — gamertag, password, *Sign in* or *Register*, and the server
   URL. A failure shows the server's own code (`bad_credentials`, `taken`).
   Nothing is remembered but the server; `libxlive` keeps the tokens.
-- **Home** — the account card, the titles with *Play*, and the form that adds
-  a title (name, title id, executable, working directory, environment).
+- **Home** — the account card, and the **Games**: every port the launcher
+  knows, with *Install*, *Update to vX*, *Play*, the release notes, and
+  where to put your game. Releases come from the ports' GitHub release
+  pages and are checked against the release's `SHA256SUMS` before they are
+  put in place; a release without one is refused.
 - **Friends** — the list, grouped into requests received, friends and requests
   sent, with presence ("playing Dead Rising Case West - Navigating the
   menus"). Add by gamertag, accept, decline, remove, block, and *Invite* —
@@ -50,19 +54,53 @@ The launcher stays open while the game runs. That is deliberate: it is what
 keeps the player "online" between games, and the server's presence logic
 counts on a player having a launcher and a game connected at once.
 
+## Games
+
+The launcher installs the XenonRecomp ports from their public releases:
+
+| Game | Title id | Release page |
+|---|---|---|
+| Dead Rising 2: Case Zero | `58410a8d` | github.com/wivi514/Dead_Rising_2_Case_Zero_Xenon_Recomp |
+| Dead Rising 2: Case West | `58410b00` | github.com/wivi514/Dead_Rising_2_Case_West_Xenon_Recomp |
+
+**It ships no game data.** Each port needs your own copy of the game — the
+XBLA package your Xbox 360 downloaded — and the port's first run turns it
+into everything else. After *Install*, the card says where to put it:
+`<install dir>/assets/package/`. Dropping it onto the game's own window after
+*Play* works too; that is the port's own installer.
+
+On Linux the launcher installs the port's **AppImage** — one file, which the
+port treats as sitting beside its data root — so an *Update* replaces that
+one file and never touches `assets/`. On Windows it unpacks the release zip
+over the previous version, again without deleting anything, so the unpacked
+game and the shader cache survive. Installed games live under
+`~/.local/share/XenonLive/games/<game>/` (Windows:
+`%LOCALAPPDATA%\XenonLive\games\`); `"games_dir"` in `launcher.json` moves
+them. A machine without FUSE gets `APPIMAGE_EXTRACT_AND_RUN=1`, which the
+AppImage runtime honours.
+
+The launcher checks each installed game against GitHub's latest release when
+it starts, and on *Check for updates*. That is one unauthenticated request per
+game (GitHub allows 60 an hour per address).
+
+A build you point at by hand — a dev tree, say — still works: a `titles` entry
+in `launcher.json` with `exe`/`cwd`/`env` and no `key` shows up under *Builds
+from launcher.json* with a *Play* button, and the launcher leaves it alone.
+
 ## Where things live
 
-Everything is in the XenonLive data directory — `~/.config/XenonLive` on
-Linux, `%APPDATA%\XenonLive` on Windows, `~/Library/Application
-Support/XenonLive` on macOS; `XLIVE_DATA_DIR` overrides it:
+Everything but the games is in the XenonLive data directory —
+`~/.config/XenonLive` on Linux, `%APPDATA%\XenonLive` on Windows, `~/Library/Application
+Support/XenonLive` on macOS; `XLIVE_DATA_DIR` overrides it (and puts the games
+under `<that>/games`):
 
 | File | What |
 |---|---|
 | `session.json` | the tokens and the server, written by the launcher and read by every game |
-| `launcher.json` | this launcher's config: server, titles |
+| `launcher.json` | this launcher's config: server, installed games |
 | `launcher/` | the launcher's own cache, kept apart from a game's files in the same directory |
 
-`launcher.json`:
+`launcher.json`, as the launcher writes it after installing Case West:
 
 ```json
 {
@@ -70,26 +108,28 @@ Support/XenonLive` on macOS; `XLIVE_DATA_DIR` overrides it:
   "allow_insecure": true,
   "titles": [
     {
+      "key": "case_west",
+      "version": "v1.0.1",
       "title_id": "58410b00",
       "name": "Dead Rising 2: Case West",
-      "exe": "/home/you/GithubRepo/Dead_Rising_2_Case_West_Xenon_Recomp/runtime/build/cw_runtime",
-      "cwd": "/home/you/GithubRepo/Dead_Rising_2_Case_West_Xenon_Recomp/runtime/build",
-      "env": { "CW_VKDRAW": "1", "CW_LAUNCHER": "1",
-               "CW_XLIVE_ONLINE": "1", "CW_XLIVE_COOP": "1" }
+      "exe": "/home/you/.local/share/XenonLive/games/case_west/CaseWestRecomp-linux-x86_64.AppImage",
+      "cwd": "/home/you/.local/share/XenonLive/games/case_west",
+      "env": { "CW_XLIVE_ONLINE": "1", "CW_XLIVE_COOP": "1" }
     }
   ]
 }
 ```
 
-The launcher does not discover titles; you add them, on the Home tab or in
-this file. The title id is what `cw_runtime --diag` prints. `allow_insecure`
-sets `XLIVE_ALLOW_INSECURE=1` for the launcher and for every title it starts —
-plain http, no certificate check — and is for a local development server only.
+`allow_insecure` sets `XLIVE_ALLOW_INSECURE=1` for the launcher and for every
+title it starts — plain http, no certificate check — and is for a local
+development server only.
 
-A title is started with the launcher's environment plus its `env` on top. A
-dev build of Case West needs `CW_VKDRAW=1` to draw anything (only the shipped
-`cw_defaults.env` sets it), `CW_XLIVE_ONLINE=1` to be told it is signed in,
-and `CW_XLIVE_COOP=1` for sessions and invitations.
+A title is started with the launcher's environment plus its `env` on top. The
+shipped `cw_defaults.env` / `cz_defaults.env` already turn the renderer and
+the port's pre-boot settings window on; the launcher adds the XenonLive half
+(`*_XLIVE_ONLINE=1` to be told it is signed in, `*_XLIVE_COOP=1` for sessions
+and invitations). Releases published before the ports' `xlive-integration`
+branch shipped ignore both and simply play offline.
 
 ## Font
 
@@ -100,7 +140,7 @@ a TTF instead.
 
 ## Driving it from a shell
 
-Three environment variables exist for running the launcher with nobody at the
+A few environment variables exist for running the launcher with nobody at the
 screen (the acceptance run in `PLAN.md` uses them):
 
 | Variable | Effect |
@@ -109,28 +149,37 @@ screen (the acceptance run in `PLAN.md` uses them):
 | `XENONLIVE_TAB=home\|friends\|invites\|achievements` | the starting tab |
 | `XENONLIVE_PLAY=1` | presses Play on the first title once signed in |
 | `XENONLIVE_ACCEPT=1` | presses Accept on the first invitation in the inbox |
+| `XENONLIVE_INSTALL=case_west` | presses Install on that game |
+| `XENONLIVE_SCREENSHOT_MS=5000` | takes the screenshot later than two seconds |
 
 With `SDL_VIDEODRIVER=offscreen` the whole thing runs without a display.
 
 ## Not in v1, on purpose
 
 Leaderboards, gamerpics, achievement art, a friend's profile page, settings
-beyond the server URL, the in-game overlay, Windows packaging. Each is a tab
-or a file later; none changes the shape of what is here. `launch.cpp` has the
-`CreateProcessW` path already, but it has not been built on Windows.
+beyond the server URL, the in-game overlay, Windows packaging, the Steam Deck
+tarball (the AppImage runs there too). Each is a tab or a file later; none
+changes the shape of what is here. `launch.cpp` has the `CreateProcessW`
+path and `archive.cpp` the zip path already; the zip path is tested here
+against the real Windows bundle, but neither has been built on Windows.
 
 ## Layout
 
 ```
 CMakeLists.txt
 thirdparty/imgui/        Dear ImGui 1.91.9b, the files this build uses
+thirdparty/miniz/        miniz 3.0.2
 src/
   main.cpp               SDL2 window + SDL_Renderer, the ImGui frame loop
   app.h / app.cpp        the client, its event queue, the tickets, the game
   config.h / config.cpp  launcher.json
+  catalog.h / .cpp       the games the launcher can install
+  installer.h / .cpp     GitHub release lookup, download, SHA-256 check, install
+  archive.h / .cpp       unpacking the Windows zip
+  sha256.h / .cpp        SHA-256
   launch.h / launch.cpp  starting a title and noticing it stop
   toasts.h / toasts.cpp  notifications
   screens/               one function per tab
-tools/fetch_imgui.sh     re-vendors ImGui
+tools/fetch_thirdparty.sh  re-vendors ImGui and miniz
 PLAN.md                  what this was built from
 ```

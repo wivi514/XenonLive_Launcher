@@ -5,7 +5,7 @@
 # statically from the sibling XenonLive checkout. One binary; the only runtime
 # dependencies are SDL2 and libcurl, which libxlive already needs.
 cmake_minimum_required(VERSION 3.20)
-project(xenonlive_launcher CXX)
+project(xenonlive_launcher C CXX)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -22,6 +22,9 @@ set(XLIVE_BUILD_TESTS OFF CACHE BOOL "" FORCE)
 add_subdirectory("${XLIVE_ROOT}/client" "${CMAKE_CURRENT_BINARY_DIR}/xlive")
 
 find_package(SDL2 REQUIRED)
+# libxlive treats libcurl as optional (a game without it is merely offline);
+# the launcher downloads releases, so here it is required.
+find_package(CURL REQUIRED)
 
 # Dear ImGui 1.91.9b, vendored under thirdparty/ rather than fetched: a port
 # pins this checkout for a decade, and code we own beats a module that may not
@@ -41,12 +44,22 @@ target_link_libraries(imgui PUBLIC SDL2::SDL2)
 # ImGui's own warnings are not ours to fix.
 target_compile_options(imgui PRIVATE -w)
 
+# miniz 3.0.2, the zip reader for the Windows release bundle. Vendored for
+# the same reason, and built everywhere so the Windows path is tested here.
+add_library(miniz STATIC thirdparty/miniz/miniz.c)
+target_include_directories(miniz PUBLIC thirdparty/miniz)
+target_compile_options(miniz PRIVATE -w)
+
 add_executable(xenonlive_launcher
     src/main.cpp
     src/app.cpp
     src/config.cpp
     src/launch.cpp
     src/toasts.cpp
+    src/catalog.cpp
+    src/installer.cpp
+    src/archive.cpp
+    src/sha256.cpp
     src/screens/signin.cpp
     src/screens/home.cpp
     src/screens/friends.cpp
@@ -68,7 +81,7 @@ target_compile_options(xenonlive_launcher PRIVATE
 target_compile_definitions(xenonlive_launcher PRIVATE
     $<$<BOOL:${WIN32}>:NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS>
 )
-target_link_libraries(xenonlive_launcher PRIVATE xlive::client imgui SDL2::SDL2)
+target_link_libraries(xenonlive_launcher PRIVATE xlive::client imgui miniz CURL::libcurl SDL2::SDL2)
 if(TARGET SDL2::SDL2main)
     target_link_libraries(xenonlive_launcher PRIVATE SDL2::SDL2main)
 endif()

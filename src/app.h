@@ -14,7 +14,9 @@
 #include <string>
 #include <vector>
 
+#include "catalog.h"
 #include "config.h"
+#include "installer.h"
 #include "launch.h"
 #include "toasts.h"
 #include "xlive/client.h"
@@ -105,6 +107,24 @@ public:
     bool Launch(int title_index, std::string& error);
     std::string TitleName(uint32_t title_id) const;
 
+    // -- installing from the catalog ------------------------------------------
+    Installer installer;
+    // The latest tag GitHub reported per catalog key, once asked.
+    std::map<std::string, std::string> latest_tags;
+    // The release page for that tag, for a "Release notes" button.
+    std::map<std::string, std::string> release_pages;
+    // The last failure per key, shown on the card until the next attempt.
+    std::map<std::string, std::string> install_errors;
+    void InstallGame(const CatalogGame& game);
+    void CheckGame(const CatalogGame& game);
+    // Queues a latest-release check for every installed catalog game; they
+    // run one at a time behind the installer.
+    void CheckInstalledGames();
+    int TitleIndexForKey(const std::string& key) const;
+    // What the install directory holds: "no package yet", "package found",
+    // "ready" (the first run has unpacked it).
+    std::string PackageState(const TitleEntry& entry) const;
+
 private:
     // Declared before `client` so it outlives the worker that pushes into it.
     std::mutex events_mutex_;
@@ -113,6 +133,15 @@ private:
     std::vector<xlive::Client::Friend> last_friends_;
     bool friends_baseline_ = false;
     std::vector<PendingSocial> pending_;
+    // Installs and checks, one at a time, in the order asked.
+    struct InstallJob {
+        std::string key;
+        bool install = false;
+    };
+    std::deque<InstallJob> install_queue_;
+    bool checked_installed_ = false;
+    void QueueInstallJob(const std::string& key, bool install);
+    void PollInstaller();
 
     void StartClient();
     void DrainEvents();

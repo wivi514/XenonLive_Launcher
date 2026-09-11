@@ -58,7 +58,9 @@ void LoadFont(ImGuiIO& io, const launcher::Config& config) {
 // seconds and keeps going; XENONLIVE_TAB=home|friends|invites|achievements
 // picks the starting tab; XENONLIVE_PLAY=1 presses Play on the first title
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
-// in the inbox. None does anything unless set.
+// in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
+// XENONLIVE_SCREENSHOT_MS moves the screenshot later than two seconds. None
+// does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
     SDL_GetRendererOutputSize(renderer, &w, &h);
@@ -113,6 +115,7 @@ int main(int, char**) {
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
     ApplyStyle(ImGui::GetStyle());
 
+    launcher::Installer::GlobalInit();
     launcher::App app;
     std::string error;
     if (!app.Init(error)) {
@@ -124,7 +127,10 @@ int main(int, char**) {
     const char* screenshot = std::getenv("XENONLIVE_SCREENSHOT");
     bool play = std::getenv("XENONLIVE_PLAY") != nullptr;
     bool accept = std::getenv("XENONLIVE_ACCEPT") != nullptr;
-    const Uint32 screenshot_at = SDL_GetTicks() + 2000;
+    const char* screenshot_ms = std::getenv("XENONLIVE_SCREENSHOT_MS");
+    const Uint32 screenshot_at =
+        SDL_GetTicks() + (screenshot_ms ? Uint32(std::strtoul(screenshot_ms, nullptr, 10)) : 2000u);
+    const char* install_key = std::getenv("XENONLIVE_INSTALL");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -152,6 +158,14 @@ int main(int, char**) {
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();
         app.Frame();
+        if (install_key && app.signed_in()) {
+            if (const launcher::CatalogGame* game = launcher::CatalogByKey(install_key)) {
+                app.InstallGame(*game);
+            } else {
+                std::fprintf(stderr, "[launcher] XENONLIVE_INSTALL: no such game %s\n", install_key);
+            }
+            install_key = nullptr;
+        }
         if (accept && app.signed_in() && app.client->online()) {
             const auto inbox = app.client->invites();
             if (!inbox.empty()) {
@@ -185,5 +199,6 @@ int main(int, char**) {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+    launcher::Installer::GlobalCleanup();
     return 0;
 }

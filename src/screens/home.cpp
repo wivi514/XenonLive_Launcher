@@ -1,8 +1,12 @@
-// The account card, the titles with Play, Sign out — and the form that adds
-// a title, because the launcher does not discover them.
+// The account card, Sign out, and the Games section: every game the
+// launcher knows how to install, its installed version, whether a newer
+// release exists, and Play. The launcher downloads the port's release for
+// this platform; the player supplies their own XBLA package, and an update
+// never touches it.
 #include <cstdio>
 #include <cstring>
-#include <sstream>
+
+#include <SDL.h>
 
 #include "app.h"
 #include "imgui.h"
@@ -12,64 +16,137 @@ namespace launcher {
 
 namespace {
 
-// The add/edit form. Static: it is the one form on the one home screen.
-struct TitleForm {
-    char name[128] = {};
-    char title_id[16] = {};
-    char exe[512] = {};
-    char cwd[512] = {};
-    char env[1024] = {};
-    int editing = -1;  // index being edited, or -1 for a new entry
-    std::string error;
+const ImVec4 kGreen(0.45f, 0.85f, 0.45f, 1.0f);
+const ImVec4 kAmber(0.9f, 0.7f, 0.35f, 1.0f);
+const ImVec4 kRed(0.9f, 0.4f, 0.4f, 1.0f);
 
-    void Load(const TitleEntry& entry, int index) {
-        std::snprintf(name, sizeof(name), "%s", entry.name.c_str());
-        std::snprintf(title_id, sizeof(title_id), "%s", TitleIdHex(entry.title_id).c_str());
-        std::snprintf(exe, sizeof(exe), "%s", entry.exe.c_str());
-        std::snprintf(cwd, sizeof(cwd), "%s", entry.cwd.c_str());
-        std::string lines;
-        for (const auto& [key, value] : entry.env) lines += key + "=" + value + "\n";
-        std::snprintf(env, sizeof(env), "%s", lines.c_str());
-        editing = index;
-        error.clear();
-    }
-    void Clear() {
-        std::memset(name, 0, sizeof(name));
-        std::memset(title_id, 0, sizeof(title_id));
-        std::memset(exe, 0, sizeof(exe));
-        std::memset(cwd, 0, sizeof(cwd));
-        std::memset(env, 0, sizeof(env));
-        editing = -1;
-        error.clear();
-    }
-    bool Read(TitleEntry& out) {
-        if (!ParseTitleId(title_id, out.title_id) || out.title_id == 0) {
-            error = "title id must be 1-8 hex digits, e.g. 58410b00 (cw_runtime --diag prints it)";
-            return false;
+std::string Megabytes(uint64_t bytes) {
+    char buf[32];
+    std::snprintf(buf, sizeof(buf), "%.1f MB", double(bytes) / (1024.0 * 1024.0));
+    return buf;
+}
+
+void OpenFolder(const std::string& path) {
+#ifdef _WIN32
+    SDL_OpenURL(("file:///" + path).c_str());
+#else
+    SDL_OpenURL(("file://" + path).c_str());
+#endif
+}
+
+// The card for one catalog game.
+void DrawGame(App& app, const CatalogGame& game) {
+    const int index = app.TitleIndexForKey(game.key);
+    const TitleEntry* entry = index >= 0 ? &app.config.titles[size_t(index)] : nullptr;
+    const InstallProgress progress = app.installer.Poll();
+    const bool working = app.installer.busy() && progress.key == game.key;
+    const bool other_working = app.installer.busy() && progress.key != game.key;
+    const bool running_this = app.game.running() && app.running_title == index && index >= 0;
+    const auto latest = app.latest_tags.find(game.key);
+    const bool update_available =
+        entry && latest != app.latest_tags.end() && latest->second != entry->version;
+
+    ImGui::PushID(game.key);
+    ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    ImGui::Text("%s", game.name);
+    ImGui::SameLine();
+    ImGui::TextDisabled("%s", TitleIdHex(game.title_id).c_str());
+
+    // -- the state line ------------------------------------------------------
+    if (working) {
+        const char* phase = PhaseName(progress.phase);
+        if (progress.phase == InstallPhase::Downloading && progress.total > 0) {
+            const float fraction = float(double(progress.done) / double(progress.total));
+            char overlay[64];
+            std::snprintf(overlay, sizeof(overlay), "%s / %s", Megabytes(progress.done).c_str(),
+                          Megabytes(progress.total).c_str());
+            ImGui::ProgressBar(fraction, ImVec2(-100.0f, 0.0f), overlay);
+        } else if (progress.phase == InstallPhase::Installing && progress.total > 0) {
+            ImGui::ProgressBar(float(double(progress.done) / double(progress.total)),
+                               ImVec2(-100.0f, 0.0f), "unpacking");
+        } else {
+            ImGui::ProgressBar(-1.0f * float(ImGui::GetTime()), ImVec2(-100.0f, 0.0f), phase);
         }
-        out.name = name;
-        if (out.name.empty()) out.name = TitleIdHex(out.title_id);
-        out.exe = exe;
-        out.cwd = cwd;
-        out.env.clear();
-        std::istringstream lines(env);
-        std::string line;
-        while (std::getline(lines, line)) {
-            while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
-            if (line.empty() || line[0] == '#') continue;
-            const size_t eq = line.find('=');
-            if (eq == std::string::npos || eq == 0) {
-                error = "env lines are KEY=VALUE: " + line;
-                return false;
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Cancel")) app.installer.Cancel();
+    } else if (!entry) {
+        ImGui::TextDisabled("not installed");
+        if (latest != app.latest_tags.end()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("- latest is %s", latest->second.c_str());
+        }
+    } else {
+        ImGui::TextColored(kGreen, "installed %s", entry->version.c_str());
+        if (update_available) {
+            ImGui::SameLine();
+            ImGui::TextColored(kAmber, "- %s is available", latest->second.c_str());
+        } else if (latest != app.latest_tags.end()) {
+            ImGui::SameLine();
+            ImGui::TextDisabled("- up to date");
+        }
+    }
+    const auto error = app.install_errors.find(game.key);
+    if (error != app.install_errors.end() && !working) {
+        ImGui::PushTextWrapPos(0.0f);
+        ImGui::TextColored(kRed, "%s", error->second.c_str());
+        ImGui::PopTextWrapPos();
+    }
+
+    // -- where the player's game goes ------------------------------------------
+    if (entry) {
+        const std::string state = app.PackageState(*entry);
+        const std::string package_dir =
+            (std::filesystem::path(entry->cwd) / "assets" / "package").string();
+        if (state == "ready") {
+            ImGui::TextDisabled("your game data is installed");
+        } else if (state == "package found") {
+            ImGui::TextDisabled("your package is in place; the first Play unpacks it");
+        } else {
+            ImGui::TextColored(kAmber, "put your XBLA package (title %s) in:",
+                               TitleIdHex(game.title_id).c_str());
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextDisabled("%s", package_dir.c_str());
+            ImGui::PopTextWrapPos();
+            ImGui::TextDisabled("or drop it onto the game's own window after pressing Play");
+        }
+    }
+
+    // -- the buttons ------------------------------------------------------------
+    ImGui::BeginDisabled(working || other_working);
+    if (!entry) {
+        if (ImGui::Button("Install", ImVec2(90.0f, 0.0f))) app.InstallGame(game);
+    } else if (running_this) {
+        ImGui::TextColored(kGreen, "running (pid %lld)", (long long)app.game.pid());
+    } else {
+        ImGui::BeginDisabled(app.game.running());
+        if (ImGui::Button("Play", ImVec2(90.0f, 0.0f))) {
+            std::string launch_error;
+            if (!app.Launch(index, launch_error)) {
+                app.toasts.Push("Could not launch: " + launch_error, 8.0);
             }
-            out.env[line.substr(0, eq)] = line.substr(eq + 1);
         }
-        error.clear();
-        return true;
+        ImGui::EndDisabled();
+        ImGui::SameLine();
+        if (update_available) {
+            if (ImGui::Button(("Update to " + latest->second).c_str())) app.InstallGame(game);
+        } else {
+            if (ImGui::SmallButton("Reinstall")) app.InstallGame(game);
+        }
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Folder")) OpenFolder(entry->cwd);
     }
-};
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Check for updates")) app.CheckGame(game);
+    const auto page = app.release_pages.find(game.key);
+    if (page != app.release_pages.end() && !page->second.empty()) {
+        ImGui::SameLine();
+        if (ImGui::SmallButton("Release notes")) SDL_OpenURL(page->second.c_str());
+    }
+    ImGui::EndDisabled();
 
-TitleForm form;
+    ImGui::EndChild();
+    ImGui::PopID();
+}
 
 }  // namespace
 
@@ -88,97 +165,54 @@ void DrawHome(App& app) {
     ImGui::EndChild();
 
     if (!app.config_error.empty()) {
-        ImGui::TextColored(ImVec4(0.9f, 0.6f, 0.3f, 1.0f), "%s", app.config_error.c_str());
+        ImGui::TextColored(kAmber, "%s", app.config_error.c_str());
     }
 
-    // -- titles ------------------------------------------------------------
+    // -- games ------------------------------------------------------------
     ImGui::Spacing();
-    ImGui::SeparatorText("Titles");
-    if (app.config.titles.empty()) {
-        ImGui::TextDisabled("No titles yet. Add one below.");
-    }
+    ImGui::SeparatorText("Games");
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("Releases are downloaded from GitHub and checked against the "
+                        "release's SHA256SUMS. You supply your own copy of each game.");
+    ImGui::PopTextWrapPos();
+    for (const CatalogGame& game : Catalog()) DrawGame(app, game);
+    ImGui::PushTextWrapPos(0.0f);
+    ImGui::TextDisabled("installed under %s",
+                        (app.config.games_dir.empty() ? DefaultGamesDir()
+                                                      : std::filesystem::path(app.config.games_dir))
+                            .string()
+                            .c_str());
+    ImGui::PopTextWrapPos();
+
+    // -- builds pointed at by hand ----------------------------------------------
+    bool any_custom = false;
+    for (const TitleEntry& entry : app.config.titles) any_custom |= !entry.managed();
+    if (!any_custom) return;
+    ImGui::Spacing();
+    ImGui::SeparatorText("Builds from launcher.json");
     for (int i = 0; i < int(app.config.titles.size()); ++i) {
         const TitleEntry& entry = app.config.titles[size_t(i)];
+        if (entry.managed()) continue;
         ImGui::PushID(i);
-        ImGui::BeginChild("title", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("custom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         ImGui::Text("%s", entry.name.c_str());
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TitleIdHex(entry.title_id).c_str());
-        ImGui::TextDisabled("%s", entry.exe.empty() ? "(no executable)" : entry.exe.c_str());
-
-        const bool running_this = app.game.running() && app.running_title == i;
-        const bool running_other = app.game.running() && app.running_title != i;
-        if (running_this) {
-            ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "running (pid %lld)",
-                               (long long)app.game.pid());
+        ImGui::TextDisabled("%s", entry.exe.c_str());
+        if (app.game.running() && app.running_title == i) {
+            ImGui::TextColored(kGreen, "running (pid %lld)", (long long)app.game.pid());
         } else {
-            ImGui::BeginDisabled(running_other || entry.exe.empty());
-            if (ImGui::Button("Play", ImVec2(80.0f, 0.0f))) {
-                std::string error;
-                if (!app.Launch(i, error)) app.toasts.Push("Could not launch: " + error, 8.0);
+            ImGui::BeginDisabled(app.game.running() || entry.exe.empty());
+            if (ImGui::Button("Play", ImVec2(90.0f, 0.0f))) {
+                std::string launch_error;
+                if (!app.Launch(i, launch_error)) {
+                    app.toasts.Push("Could not launch: " + launch_error, 8.0);
+                }
             }
             ImGui::EndDisabled();
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Edit")) form.Load(entry, i);
-            ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) {
-                app.config.titles.erase(app.config.titles.begin() + i);
-                app.SaveConfigOrToast();
-                if (form.editing == i) form.Clear();
-                if (app.achievements.title_index >= int(app.config.titles.size())) {
-                    app.achievements = App::AchievementsState{};
-                }
-                ImGui::EndChild();
-                ImGui::PopID();
-                break;
-            }
         }
         ImGui::EndChild();
         ImGui::PopID();
-    }
-
-    // -- add / edit ---------------------------------------------------------
-    ImGui::Spacing();
-    ImGui::SeparatorText(form.editing >= 0 ? "Edit title" : "Add a title");
-    const float label_w = 90.0f;
-    const auto field = [&](const char* label, char* buf, size_t size) {
-        ImGui::TextUnformatted(label);
-        ImGui::SameLine(label_w);
-        ImGui::SetNextItemWidth(-1.0f);
-        ImGui::PushID(label);
-        ImGui::InputText("##f", buf, size);
-        ImGui::PopID();
-    };
-    field("Name", form.name, sizeof(form.name));
-    field("Title id", form.title_id, sizeof(form.title_id));
-    field("Executable", form.exe, sizeof(form.exe));
-    field("Run in", form.cwd, sizeof(form.cwd));
-    ImGui::TextUnformatted("Environment");
-    ImGui::SameLine(label_w);
-    ImGui::InputTextMultiline("##env", form.env, sizeof(form.env),
-                              ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
-    ImGui::SetCursorPosX(label_w);
-    ImGui::TextDisabled("KEY=VALUE per line. Case West needs CW_VKDRAW=1 for a picture, "
-                        "CW_XLIVE_ONLINE=1 and CW_XLIVE_COOP=1 for the social features.");
-
-    if (ImGui::Button(form.editing >= 0 ? "Save" : "Add")) {
-        TitleEntry entry;
-        if (form.Read(entry)) {
-            if (form.editing >= 0 && form.editing < int(app.config.titles.size())) {
-                app.config.titles[size_t(form.editing)] = entry;
-            } else {
-                app.config.titles.push_back(entry);
-            }
-            app.SaveConfigOrToast();
-            form.Clear();
-        }
-    }
-    if (form.editing >= 0) {
-        ImGui::SameLine();
-        if (ImGui::Button("Cancel")) form.Clear();
-    }
-    if (!form.error.empty()) {
-        ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.0f), "%s", form.error.c_str());
     }
 }
 

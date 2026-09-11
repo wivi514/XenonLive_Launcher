@@ -7,6 +7,10 @@
 #include "imgui.h"
 #include "screens/screens.h"
 
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace launcher {
 
 namespace {
@@ -261,6 +265,15 @@ bool App::Launch(int title_index, std::string& error) {
     }
     std::map<std::string, std::string> env = entry.env;
     if (config.allow_insecure) env["XLIVE_ALLOW_INSECURE"] = "1";
+#ifndef _WIN32
+    // An AppImage mounts itself with FUSE. Without /dev/fuse the type-2
+    // runtime can extract itself to a temporary directory and run from there
+    // instead, if told to; a machine with no FUSE is not a machine that
+    // cannot play.
+    if (entry.managed() && ::access("/dev/fuse", F_OK) != 0) {
+        env["APPIMAGE_EXTRACT_AND_RUN"] = "1";
+    }
+#endif
     if (!game.Start(entry.exe, entry.cwd, env, error)) return false;
     running_title = title_index;
     return true;
@@ -282,6 +295,119 @@ void App::PollGame() {
         toasts.Push(name + " exited");
     }
     running_title = -1;
+}
+
+// -- installing from the catalog ------------------------------------------------
+
+int App::TitleIndexForKey(const std::string& key) const {
+    for (size_t i = 0; i < config.titles.size(); ++i) {
+        if (config.titles[i].key == key) return int(i);
+    }
+    return -1;
+}
+
+void App::QueueInstallJob(const std::string& key, bool install) {
+    for (InstallJob& job : install_queue_) {
+        if (job.key != key) continue;
+        // An install supersedes a check of the same game; a second check
+        // adds nothing.
+        job.install = job.install || install;
+        return;
+    }
+    install_queue_.push_back({key, install});
+}
+
+void App::InstallGame(const CatalogGame& item) {
+    if (running_title >= 0 && game.running() &&
+        config.titles[size_t(running_title)].key == item.key) {
+        toasts.Push(std::string(item.name) + " is running; quit it before updating");
+        return;
+    }
+    install_errors.erase(item.key);
+    QueueInstallJob(item.key, true);
+}
+
+void App::CheckGame(const CatalogGame& item) { QueueInstallJob(item.key, false); }
+
+void App::CheckInstalledGames() {
+    for (const TitleEntry& entry : config.titles) {
+        if (entry.managed() && CatalogByKey(entry.key)) QueueInstallJob(entry.key, false);
+    }
+}
+
+std::string App::PackageState(const TitleEntry& entry) const {
+    std::error_code ec;
+    const std::filesystem::path assets = std::filesystem::path(entry.cwd) / "assets";
+    if (std::filesystem::is_directory(assets / "game", ec)) return "ready";
+    const std::filesystem::path package = assets / "package";
+    if (std::filesystem::is_directory(package, ec)) {
+        for (const auto& item : std::filesystem::directory_iterator(package, ec)) {
+            if (!item.is_regular_file(ec)) continue;
+            // The port seeds a PUT_YOUR_GAME_HERE.txt; the package itself is
+            // the console's hash-named file with no extension.
+            if (item.path().extension() == ".txt") continue;
+            return "package found";
+        }
+    }
+    return "no package yet";
+}
+
+void App::PollInstaller() {
+    // A finished job is consumed BEFORE the next one starts: starting a job
+    // resets the progress, and a result nobody read is an install the
+    // config never learns about.
+    const InstallProgress progress = installer.Poll();
+    const bool finished = !installer.busy() && (progress.phase == InstallPhase::Done ||
+                                                progress.phase == InstallPhase::Failed);
+    if (finished) {
+        const CatalogGame* item = CatalogByKey(progress.key);
+        std::fprintf(stderr, "[installer] %s: %s %s\n", progress.key.c_str(),
+                     PhaseName(progress.phase), progress.message.c_str());
+        if (progress.phase == InstallPhase::Failed) {
+            install_errors[progress.key] = progress.message;
+            if (item) toasts.Push(std::string(item->name) + ": " + progress.message, 8.0);
+        } else if (item) {
+            latest_tags[progress.key] = progress.release.tag;
+            release_pages[progress.key] = progress.release.html_url;
+            if (progress.installed) {
+                // The install becomes an ordinary title: everything else —
+                // Play, invites, achievements — works off the entry from here.
+                const std::filesystem::path dir = config.InstallDir(item->key);
+                int index = TitleIndexForKey(item->key);
+                if (index < 0) {
+                    config.titles.push_back(TitleEntry{});
+                    index = int(config.titles.size()) - 1;
+                }
+                TitleEntry& entry = config.titles[size_t(index)];
+                entry.key = item->key;
+                entry.version = progress.release.tag;
+                entry.title_id = item->title_id;
+                entry.name = item->name;
+                entry.exe = (dir / PlatformExecutable(*item)).string();
+                entry.cwd = dir.string();
+                // The shipped *_defaults.env already turns the renderer and
+                // the port's own pre-boot window on; these are the XenonLive
+                // half.
+                entry.env[std::string(item->prefix) + "_XLIVE_ONLINE"] = "1";
+                entry.env[std::string(item->prefix) + "_XLIVE_COOP"] = "1";
+                SaveConfigOrToast();
+                toasts.Push(std::string(item->name) + " " + progress.release.tag + " installed", 6.0);
+            }
+        }
+        installer.Acknowledge();
+    }
+
+    if (!installer.busy() && !install_queue_.empty()) {
+        const InstallJob job = install_queue_.front();
+        install_queue_.pop_front();
+        if (const CatalogGame* item = CatalogByKey(job.key)) {
+            if (job.install) {
+                installer.Install(*item, config.InstallDir(item->key));
+            } else {
+                installer.CheckLatest(*item);
+            }
+        }
+    }
 }
 
 // -- events -------------------------------------------------------------------
@@ -391,6 +517,11 @@ void App::Frame() {
     DrainEvents();
     PollPending();
     PollGame();
+    PollInstaller();
+    if (!checked_installed_) {
+        checked_installed_ = true;
+        CheckInstalledGames();
+    }
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);
