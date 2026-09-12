@@ -47,6 +47,13 @@ const ImVec4& kDim = xlive::theme::kMuted;
 struct Toast {
     std::string text;
     double expires_at = 0;
+    // An unlock is the one toast with a picture: the tile, the name, the
+    // score and the description, the way the console's popup had them.
+    bool achievement = false;
+    uint32_t image_id = 0;
+    std::string name;
+    std::string description;
+    uint32_t score = 0;
 };
 
 struct PendingSocial {
@@ -593,14 +600,35 @@ void Overlay::Impl::DrainEvents(Client& c) {
     }
     for (const xlive::Event& event : batch) {
         switch (event.kind) {
-            case xlive::EventKind::AchievementUnlocked:
+            case xlive::EventKind::AchievementUnlocked: {
                 title_stale = true;
-                Push("Achievement unlocked: " +
-                         (event.achievement_name.empty() ? "#" + std::to_string(event.achievement_id)
-                                                         : event.achievement_name) +
-                         (event.score ? " (" + std::to_string(event.score) + " G)" : ""),
-                     7.0);
+                Toast t;
+                t.achievement = true;
+                t.name = event.achievement_name.empty() ? "#" + std::to_string(event.achievement_id)
+                                                        : event.achievement_name;
+                t.score = event.score;
+                // The description and the tile come from the definitions,
+                // read at start so they are here by the time anything is
+                // earned; a tile not on the GPU yet is asked for now and
+                // drawn the moment it lands.
+                for (const auto& a : title.title.achievements) {
+                    if (a.id != event.achievement_id) continue;
+                    if (!a.name.empty()) t.name = a.name;
+                    t.description = a.unlocked_description;
+                    if (a.score) t.score = a.score;
+                    t.image_id = a.image_id;
+                    if (t.image_id && !tiles.count(t.image_id) && !tiles_missing.count(t.image_id) &&
+                        !image_tickets.count(t.image_id)) {
+                        image_tickets[t.image_id] = c.LoadImage(title.title.title_id, t.image_id);
+                    }
+                    break;
+                }
+                t.text = "Achievement unlocked: " + t.name;
+                t.expires_at = Now() + 9.0;
+                toasts.push_back(std::move(t));
+                while (toasts.size() > 5) toasts.erase(toasts.begin());
                 break;
+            }
             case xlive::EventKind::InviteReceived:
                 Push(event.gamertag + " invited you to play - Shift+Tab to answer", 12.0);
                 break;
@@ -716,6 +744,13 @@ void Overlay::Impl::PollTickets(Client& c) {
             }
         }
     }
+    // The definitions are read as soon as the client is online — not on the
+    // first opening of the panel — so an unlock's popup has its description
+    // and tile even for a player who never presses Shift+Tab.
+    if (title_stale && !title_ticket && !title_loaded && c.online() && title_id.load() != 0) {
+        title_ticket = c.LoadTitle(title_id.load());
+        title_stale = false;
+    }
     if (title_ticket) {
         Client::TitleResult result;
         const auto status = c.Poll(title_ticket, result);
@@ -725,6 +760,19 @@ void Overlay::Impl::PollTickets(Client& c) {
                 title = std::move(result);
                 title_loaded = true;
                 title_error.clear();
+                // XLIVE_OVERLAY_FAKE_UNLOCK=<id>: the unlock popup for that
+                // achievement, for a photograph; the server learns nothing.
+                if (const char* fake = std::getenv("XLIVE_OVERLAY_FAKE_UNLOCK")) {
+                    static bool once = false;
+                    if (!once) {
+                        once = true;
+                        xlive::Event e;
+                        e.kind = xlive::EventKind::AchievementUnlocked;
+                        e.achievement_id = uint16_t(std::strtoul(fake, nullptr, 10));
+                        std::lock_guard<std::mutex> lock(events_mutex);
+                        events.push_back(e);
+                    }
+                }
                 // The tiles, once per run: the server holds them for the
                 // ids the definitions name, and they never change.
                 for (const auto& a : title.title.achievements) {
@@ -769,8 +817,12 @@ void Overlay::Impl::DrawToasts(uint32_t width, uint32_t height) {
         ImGui::SetNextWindowBgAlpha(0.9f);
         ImGui::SetNextWindowPos(ImVec2(float(width) - pad, y), ImGuiCond_Always, ImVec2(1.0f, 1.0f));
         ImGui::SetNextWindowSizeConstraints(ImVec2(220.0f * scale, 0), ImVec2(460.0f * scale, FLT_MAX));
+        // One window per toast: PushID does not reach a window's name, and
+        // a shared "##toast" would fold every toast into the first one's box.
+        char name[24];
+        std::snprintf(name, sizeof(name), "##toast%zu", i);
         ImGui::PushID(int(i));
-        if (ImGui::Begin("##toast", nullptr,
+        if (ImGui::Begin(name, nullptr,
                          ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove |
                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
@@ -780,9 +832,41 @@ void Overlay::Impl::DrawToasts(uint32_t width, uint32_t height) {
             ImGui::GetWindowDrawList()->AddRectFilled(
                 min, ImVec2(min.x + 5.0f * scale, max.y), ImGui::GetColorU32(xlive::theme::kLime),
                 ImGui::GetStyle().WindowRounding, ImDrawFlags_RoundCornersLeft);
-            ImGui::PushTextWrapPos(440.0f * scale);
-            ImGui::TextUnformatted(toasts[i].text.c_str());
-            ImGui::PopTextWrapPos();
+            const Toast& t = toasts[i];
+            if (t.achievement) {
+                // The tile on the left (a bordered square until it lands),
+                // "Achievement unlocked" in lime, the name big, the score,
+                // the description under it.
+                const float tile = 64.0f * scale;
+                auto found = t.image_id ? tiles.find(t.image_id) : tiles.end();
+                if (found != tiles.end()) {
+                    ImGui::Image(reinterpret_cast<ImTextureID>(found->second.descriptor), ImVec2(tile, tile));
+                } else {
+                    ImGui::Dummy(ImVec2(tile, tile));
+                    ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                                        ImGui::GetColorU32(ImGuiCol_Border));
+                }
+                ImGui::SameLine();
+                ImGui::BeginGroup();
+                ImGui::TextColored(xlive::theme::kLime, "Achievement unlocked");
+                ImGui::PushFont(fonts.heading);
+                ImGui::TextUnformatted(t.name.c_str());
+                ImGui::PopFont();
+                if (t.score) {
+                    ImGui::SameLine();
+                    ImGui::TextDisabled("%u G", t.score);
+                }
+                if (!t.description.empty()) {
+                    ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 330.0f * scale);
+                    ImGui::TextColored(xlive::theme::kMuted, "%s", t.description.c_str());
+                    ImGui::PopTextWrapPos();
+                }
+                ImGui::EndGroup();
+            } else {
+                ImGui::PushTextWrapPos(440.0f * scale);
+                ImGui::TextUnformatted(t.text.c_str());
+                ImGui::PopTextWrapPos();
+            }
             y -= ImGui::GetWindowSize().y + 8.0f * scale;
         }
         ImGui::End();
