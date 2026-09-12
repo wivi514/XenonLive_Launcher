@@ -7,6 +7,7 @@
 #include <fstream>
 
 #include "json.h"
+#include "paths.h"
 #include "sha256.h"
 
 #ifndef _WIN32
@@ -28,6 +29,18 @@ size_t WriteToString(char* data, size_t size, size_t count, void* user) {
 
 size_t WriteToFile(char* data, size_t size, size_t count, void* user) {
     return std::fwrite(data, 1, size * count, static_cast<std::FILE*>(user));
+}
+
+// The same trust settings libxlive uses: the CA bundle the launcher found
+// (or the player named), and no verification only when the player asked.
+void ApplyTrust(CURL* curl) {
+    if (const std::string ca = xlive::Env("XLIVE_CA_FILE"); !ca.empty()) {
+        curl_easy_setopt(curl, CURLOPT_CAINFO, ca.c_str());
+    }
+    if (xlive::Env("XLIVE_ALLOW_INSECURE") == "1") {
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
+        curl_easy_setopt(curl, CURLOPT_SSL_VERIFYHOST, 0L);
+    }
 }
 
 struct ProgressContext {
@@ -160,6 +173,7 @@ bool Installer::DownloadToString(const std::string& url, std::string& out, std::
     curl_easy_setopt(curl, CURLOPT_TIMEOUT, 60L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteToString);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &out);
+    ApplyTrust(curl);
     struct curl_slist* headers = nullptr;
     headers = curl_slist_append(headers, "Accept: application/vnd.github+json");
     curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
@@ -208,6 +222,7 @@ bool Installer::DownloadToFile(const std::string& url, const std::filesystem::pa
     curl_easy_setopt(curl, CURLOPT_LOW_SPEED_TIME, 60L);
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteToFile);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, file);
+    ApplyTrust(curl);
     curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 0L);
     curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, OnProgress);
     curl_easy_setopt(curl, CURLOPT_XFERINFODATA, &ctx);
@@ -243,16 +258,31 @@ bool Installer::FetchLatest(const CatalogGame& game, ReleaseInfo& out, std::stri
     out = ReleaseInfo{};
     out.tag = parsed.value["tag_name"].AsString();
     out.html_url = parsed.value["html_url"].AsString();
+    // The exact name first; failing that, the same bundle, platform and
+    // extension with something in between — a release has shipped
+    // "CaseZeroRecomp-linux-x86_64-pm4fix.tar.zst", and a suffix like that
+    // must not read as "no Linux build".
     const std::string wanted = PlatformAssetName(game);
+    const size_t dot = wanted.find('.', wanted.find("x86_64"));
+    const std::string stem = dot == std::string::npos ? wanted : wanted.substr(0, dot);
+    const std::string ext = dot == std::string::npos ? "" : wanted.substr(dot);
     const xlive::json::Value& assets = parsed.value["assets"];
+    bool exact = false;
     for (size_t i = 0; i < assets.size(); ++i) {
         const std::string name = assets[i]["name"].AsString();
-        if (name == wanted) {
+        if (name == "SHA256SUMS") {
+            out.sums_url = assets[i]["browser_download_url"].AsString();
+            continue;
+        }
+        const bool is_exact = name == wanted;
+        const bool is_variant = !exact && name.size() > stem.size() + ext.size() &&
+                                name.rfind(stem, 0) == 0 &&
+                                name.compare(name.size() - ext.size(), ext.size(), ext) == 0;
+        if (is_exact || (is_variant && out.asset_url.empty())) {
             out.asset_name = name;
             out.asset_url = assets[i]["browser_download_url"].AsString();
             out.asset_size = uint64_t(assets[i]["size"].AsInt(0));
-        } else if (name == "SHA256SUMS") {
-            out.sums_url = assets[i]["browser_download_url"].AsString();
+            exact = is_exact;
         }
     }
     if (out.tag.empty()) {
@@ -330,18 +360,24 @@ void Installer::Run(const CatalogGame* game, std::filesystem::path dir, bool ins
     }
 
     Set(InstallPhase::Installing, release.asset_name);
-    if (release.asset_name.size() > 4 &&
-        release.asset_name.compare(release.asset_name.size() - 4, 4, ".zip") == 0) {
-        // The zip carries one top directory (the bundle name); its contents
-        // go straight into dir/, over whatever an earlier version put there.
-        // The player's assets/ is never removed: an update is files
-        // replaced, not a directory wiped.
-        const bool ok = ExtractZipInto(part, dir, std::string(game->bundle) + "/", error,
-                                       [this](uint64_t done, uint64_t total) {
-                                           std::lock_guard<std::mutex> lock(mutex_);
-                                           progress_.done = done;
-                                           progress_.total = total;
-                                       });
+    const auto ends_with = [&](const char* suffix) {
+        const std::string s(suffix);
+        return release.asset_name.size() >= s.size() &&
+               release.asset_name.compare(release.asset_name.size() - s.size(), s.size(), s) == 0;
+    };
+    if (ends_with(".zip") || ends_with(".tar.zst")) {
+        // The archive carries one top directory (the bundle name); its
+        // contents go straight into dir/, over whatever an earlier version
+        // put there. The player's assets/ is never removed: an update is
+        // files replaced, not a directory wiped.
+        const auto on_progress = [this](uint64_t done, uint64_t total) {
+            std::lock_guard<std::mutex> lock(mutex_);
+            progress_.done = done;
+            progress_.total = total;
+        };
+        const std::string top = std::string(game->bundle) + "/";
+        const bool ok = ends_with(".zip") ? ExtractZipInto(part, dir, top, error, on_progress)
+                                          : ExtractTarZstInto(part, dir, top, error, on_progress);
         std::filesystem::remove(part, ec);
         if (!ok) {
             Fail(error);

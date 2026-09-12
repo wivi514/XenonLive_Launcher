@@ -204,8 +204,9 @@ void DrawHome(App& app) {
     ImGui::Spacing();
     ImGui::SeparatorText("Games");
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("Releases are downloaded from GitHub and checked against the "
-                        "release's SHA256SUMS. You supply your own copy of each game.");
+    ImGui::TextDisabled("Releases are downloaded from GitHub as %s builds (this launcher's own "
+                        "kind) and checked against the release's SHA256SUMS. You supply your own "
+                        "copy of each game.", FlavourName(PlatformFlavour()));
     ImGui::PopTextWrapPos();
     for (const CatalogGame& game : Catalog()) DrawGame(app, game);
     ImGui::PushTextWrapPos(0.0f);

@@ -5,6 +5,7 @@
 #include <cstring>
 
 #include "imgui.h"
+#include "paths.h"
 #include "screens/screens.h"
 
 #ifndef _WIN32
@@ -43,7 +44,35 @@ App::~App() {
     client.reset();
 }
 
+// A release build links libcurl and OpenSSL statically, and a static OpenSSL
+// only knows the certificate directory of the machine that BUILT it. So the
+// system's CA bundle is found here, at run time, and named to libxlive and
+// to this launcher's own curl handles through XLIVE_CA_FILE — unless the
+// player already set it. A dev build against the system libcurl needs none
+// of this and is not harmed by it.
+static void FindCaBundle() {
+#ifndef _WIN32
+    if (!xlive::Env("XLIVE_CA_FILE").empty()) return;
+    static const char* const candidates[] = {
+        "/etc/ssl/certs/ca-certificates.crt",  // Debian, Ubuntu, Arch, SteamOS
+        "/etc/pki/tls/certs/ca-bundle.crt",    // Fedora, RHEL
+        "/etc/ssl/ca-bundle.pem",              // openSUSE
+        "/etc/ssl/cert.pem",                   // Alpine, macOS
+        "/etc/pki/tls/cacert.pem",
+    };
+    std::error_code ec;
+    for (const char* path : candidates) {
+        if (std::filesystem::is_regular_file(path, ec)) {
+            SetEnv("XLIVE_CA_FILE", path);
+            return;
+        }
+    }
+    std::fprintf(stderr, "[launcher] no CA bundle found; HTTPS may fail to verify\n");
+#endif
+}
+
 bool App::Init(std::string& error) {
+    FindCaBundle();
     if (!LoadConfig(config, config_error)) {
         // Reported on the home screen; the defaults still start.
         std::fprintf(stderr, "[launcher] %s\n", config_error.c_str());

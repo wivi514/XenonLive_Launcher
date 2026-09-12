@@ -7,6 +7,7 @@
 
 #include <cstdio>
 #include <cstdlib>
+#include <filesystem>
 #include <string>
 
 #include "app.h"
@@ -91,6 +92,16 @@ launcher::Tab StartingTab() {
 }
 
 int main(int, char**) {
+#ifdef _WIN32
+    // A windowed executable has no console, so the log goes to a file the
+    // player can attach to a report.
+    {
+        const std::filesystem::path log = launcher::DataDir() / "launcher" / "launcher.log";
+        std::error_code ec;
+        std::filesystem::create_directories(log.parent_path(), ec);
+        std::freopen(log.string().c_str(), "w", stderr);
+    }
+#endif
     if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
         std::fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;

@@ -19,11 +19,31 @@ Needs the XenonLive checkout beside this one (`~/GithubRepo/XenonLive`, or
     cmake --build build
     ./build/xenonlive_launcher
 
-Dear ImGui 1.91.9b, miniz 3.0.2 (the zip reader for the Windows bundle) and
-stb_image.h 2.30 (the PNG decoder for the tiles) are vendored under `thirdparty/` rather than fetched, for the same reason the
+Dear ImGui 1.91.9b, miniz 3.0.2 (the zip reader for the Windows bundle),
+zstd 1.5.7's single-file decoder (the Linux tarball) and stb_image.h 2.30
+(the PNG decoder for the tiles) are vendored under `thirdparty/` rather than fetched, for the same reason the
 ports vendor their dependencies: a checkout must still build in a decade. If
 the directory is ever lost, `tools/fetch_thirdparty.sh` re-creates it from the
 pinned archives and checks their hashes.
+
+## Releases
+
+    tools/release_linux.sh      # XenonLiveLauncher-linux-x86_64.tar.zst and .AppImage
+    tools/release_windows.sh    # XenonLiveLauncher-windows-x86_64.zip
+
+Both build in containers and need only podman. Linux builds on the ports'
+old base (Ubuntu 22.04: glibc floor 2.34, the same SDL2 the ports ship) with
+libcurl and OpenSSL linked statically — distributions disagree about libcurl's
+symbol versioning, so a dynamic one linked on either side fails on the other
+— and the system CA bundle found at run time. Windows is cross-compiled with
+mingw-w64; its libcurl is static on Schannel, so the Windows certificate store
+is the trust store and nothing TLS-related ships. The output lands in
+`~/Release/XenonLive_Launcher/V<version>/` with a `SHA256SUMS`.
+
+**Which game build a launcher installs follows how the launcher itself was
+packaged**: the AppImage installs the games' AppImages, the tarball installs
+their `.tar.zst`, Windows installs the zip. An install is refused when the
+release's `SHA256SUMS` does not list the asset.
 
 ## What it does
 
@@ -99,11 +119,12 @@ into everything else. After *Install*, the card says where to put it:
 `<install dir>/assets/package/`. Dropping it onto the game's own window after
 *Play* works too; that is the port's own installer.
 
-On Linux the launcher installs the port's **AppImage** — one file, which the
-port treats as sitting beside its data root — so an *Update* replaces that
-one file and never touches `assets/`. On Windows it unpacks the release zip
-over the previous version, again without deleting anything, so the unpacked
-game and the shader cache survive. Installed games live under
+A launcher running as an **AppImage** installs the port's AppImage — one
+file, which the port treats as sitting beside its data root — so an *Update*
+replaces that one file and never touches `assets/`. A launcher from the
+**tarball** unpacks the port's `.tar.zst`, and Windows the zip, over the
+previous version without deleting anything, so the unpacked game and the
+shader cache survive. Installed games live under
 `~/.local/share/XenonLive/games/<game>/` (Windows:
 `%LOCALAPPDATA%\XenonLive\games\`); `"games_dir"` in `launcher.json` moves
 them. A machine without FUSE gets `APPIMAGE_EXTRACT_AND_RUN=1`, which the
@@ -218,6 +239,9 @@ overlay/                 the in-game overlay library (xlive::overlay), linked by
 thirdparty/imgui/        Dear ImGui 1.91.9b, the files this build uses (SDL_Renderer2 and Vulkan backends)
 thirdparty/miniz/        miniz 3.0.2
 thirdparty/stb/          stb_image.h 2.30
+thirdparty/zstd/         zstd 1.5.7, decoder only
+tools/release_linux.sh   the Linux release, on the ports' old base
+tools/release_windows.sh the Windows release, cross-compiled with mingw-w64
 src/
   main.cpp               SDL2 window + SDL_Renderer, the ImGui frame loop
   app.h / app.cpp        the client, its event queue, the tickets, the game

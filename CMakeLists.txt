@@ -50,6 +50,11 @@ add_library(miniz STATIC thirdparty/miniz/miniz.c)
 target_include_directories(miniz PUBLIC thirdparty/miniz)
 target_compile_options(miniz PRIVATE -w)
 
+# zstd 1.5.7's single-file decoder (BSD), for the Linux .tar.zst bundle.
+add_library(zstddec STATIC thirdparty/zstd/zstddeclib.c)
+target_include_directories(zstddec PUBLIC thirdparty/zstd)
+target_compile_options(zstddec PRIVATE -w)
+
 add_executable(xenonlive_launcher
     src/main.cpp
     src/app.cpp
@@ -87,7 +92,27 @@ target_compile_options(xenonlive_launcher PRIVATE
 target_compile_definitions(xenonlive_launcher PRIVATE
     $<$<BOOL:${WIN32}>:NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS>
 )
-target_link_libraries(xenonlive_launcher PRIVATE xlive::client imgui miniz CURL::libcurl SDL2::SDL2)
+# SDL2main before SDL2: it is a static archive whose WinMain calls into the
+# DLL, and GNU ld resolves archives in order.
 if(TARGET SDL2::SDL2main)
     target_link_libraries(xenonlive_launcher PRIVATE SDL2::SDL2main)
+endif()
+target_link_libraries(xenonlive_launcher PRIVATE xlive::client imgui miniz zstddec CURL::libcurl SDL2::SDL2)
+
+# A release bundle carries its own lib/ (SDL2, libstdc++) beside the
+# executable, found through the RPATH rather than a launcher script a player
+# can bypass — the same decision the ports made (their release_package_linux.sh).
+option(XENONLIVE_RELEASE "Link for a release bundle: $ORIGIN/lib RPATH, no console on Windows" OFF)
+if(XENONLIVE_RELEASE)
+    if(UNIX AND NOT APPLE)
+        set_target_properties(xenonlive_launcher PROPERTIES
+            BUILD_RPATH "$ORIGIN/lib" INSTALL_RPATH "$ORIGIN/lib" BUILD_WITH_INSTALL_RPATH ON)
+    endif()
+    if(WIN32)
+        set_target_properties(xenonlive_launcher PROPERTIES WIN32_EXECUTABLE ON)
+        if(MINGW)
+            # No libgcc/libstdc++/winpthread DLLs to ship.
+            target_link_options(xenonlive_launcher PRIVATE -static -static-libgcc -static-libstdc++)
+        endif()
+    endif()
 endif()

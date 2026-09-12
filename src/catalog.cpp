@@ -1,6 +1,45 @@
 #include "catalog.h"
 
+#include <cstdlib>
+#include <filesystem>
+
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 namespace launcher {
+
+Flavour PlatformFlavour() {
+#ifdef _WIN32
+    return Flavour::Zip;
+#else
+    // The AppImage runtime exports APPIMAGE (the file) and APPDIR (its
+    // mount). Honoured only when this executable really is inside APPDIR:
+    // a terminal that is itself an AppImage exports the same variables to
+    // every shell it opens — the same containment test the ports use.
+    static const Flavour flavour = [] {
+        const char* appimage = std::getenv("APPIMAGE");
+        const char* appdir = std::getenv("APPDIR");
+        if (!appimage || !*appimage || !appdir || !*appdir) return Flavour::Tar;
+        char exe[4096];
+        const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
+        if (n <= 0) return Flavour::Tar;
+        exe[n] = '\0';
+        const std::string path(exe), dir(appdir);
+        return path.rfind(dir, 0) == 0 ? Flavour::AppImage : Flavour::Tar;
+    }();
+    return flavour;
+#endif
+}
+
+const char* FlavourName(Flavour flavour) {
+    switch (flavour) {
+        case Flavour::Zip:      return "zip";
+        case Flavour::AppImage: return "AppImage";
+        case Flavour::Tar:      return "tar.zst";
+    }
+    return "?";
+}
 
 const std::vector<CatalogGame>& Catalog() {
     static const std::vector<CatalogGame> games = {
@@ -27,19 +66,21 @@ const CatalogGame* CatalogByTitle(uint32_t title_id) {
 }
 
 std::string PlatformAssetName(const CatalogGame& game) {
-#ifdef _WIN32
-    return std::string(game.bundle) + "-windows-x86_64.zip";
-#else
-    return std::string(game.bundle) + "-linux-x86_64.AppImage";
-#endif
+    switch (PlatformFlavour()) {
+        case Flavour::Zip:      return std::string(game.bundle) + "-windows-x86_64.zip";
+        case Flavour::AppImage: return std::string(game.bundle) + "-linux-x86_64.AppImage";
+        case Flavour::Tar:      return std::string(game.bundle) + "-linux-x86_64.tar.zst";
+    }
+    return {};
 }
 
 std::string PlatformExecutable(const CatalogGame& game) {
-#ifdef _WIN32
-    return std::string(game.runtime) + ".exe";
-#else
-    return PlatformAssetName(game);
-#endif
+    switch (PlatformFlavour()) {
+        case Flavour::Zip:      return std::string(game.runtime) + ".exe";
+        case Flavour::AppImage: return PlatformAssetName(game);
+        case Flavour::Tar:      return game.runtime;
+    }
+    return {};
 }
 
 }  // namespace launcher

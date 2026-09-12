@@ -1,0 +1,9 @@
+# The launcher's Linux release base: the ports' old base (Ubuntu 22.04, glibc
+# 2.35, clang 15 — Case West's tools/release/oldbase/Containerfile) plus the
+# static OpenSSL and zlib the launcher's libcurl links. Everything the
+# artifact links is built inside this image so its glibc floor is 2.35.
+ARG BASE=cw-oldbase:jammy
+FROM ${BASE}
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        libssl-dev zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*

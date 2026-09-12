@@ -30,9 +30,15 @@ const std::vector<CatalogGame>& Catalog();
 const CatalogGame* CatalogByKey(std::string_view key);
 const CatalogGame* CatalogByTitle(uint32_t title_id);
 
-// The release asset this platform installs: the AppImage on Linux (one file,
-// whose data root is the directory beside it, so an update replaces the
-// file and leaves the player's assets/ alone), the zip on Windows.
+// How this launcher was packaged decides how a game is: a launcher running
+// as an AppImage installs the game's AppImage (one file beside its own
+// assets/), a launcher from the tarball installs the game's .tar.zst, and
+// Windows installs the zip.
+enum class Flavour { Zip, AppImage, Tar };
+Flavour PlatformFlavour();
+const char* FlavourName(Flavour flavour);
+
+// The release asset this launcher installs for a game.
 std::string PlatformAssetName(const CatalogGame& game);
 // The executable an install produces, relative to the install directory.
 std::string PlatformExecutable(const CatalogGame& game);
