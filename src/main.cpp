@@ -5,6 +5,7 @@
 // it is the backend with the fewest ways to fail on a stranger's machine.
 #include <SDL.h>
 
+#include <algorithm>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
@@ -83,15 +84,24 @@ int main(int, char**) {
         std::freopen(log.string().c_str(), "w", stderr);
     }
 #endif
-    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER) != 0) {
+    if (SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER | SDL_INIT_GAMECONTROLLER) != 0) {
         std::fprintf(stderr, "SDL_Init: %s\n", SDL_GetError());
         return 1;
     }
     SDL_SetHint(SDL_HINT_VIDEO_ALLOW_SCREENSAVER, "1");
 
+    // A Steam Deck (Steam sets SteamDeck=1 for what it launches) gets the
+    // whole screen and a larger UI, since it is read from a couch's
+    // distance on a small panel; XENONLIVE_SCALE=<factor> does the scaling
+    // anywhere, and XENONLIVE_FULLSCREEN=1 the window.
+    const bool on_deck = std::getenv("SteamDeck") != nullptr;
+    float ui_scale = on_deck ? 1.3f : 1.0f;
+    if (const char* s = std::getenv("XENONLIVE_SCALE")) ui_scale = std::max(0.5f, float(std::atof(s)));
+    const bool fullscreen = on_deck || std::getenv("XENONLIVE_FULLSCREEN") != nullptr;
     SDL_Window* window = SDL_CreateWindow(
         "XenonLive", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 960, 640,
-        SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+        SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI |
+            (fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0));
     if (!window) {
         std::fprintf(stderr, "SDL_CreateWindow: %s\n", SDL_GetError());
         return 1;
@@ -108,8 +118,11 @@ int main(int, char**) {
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;  // one fixed layout; nothing to remember
-    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    xlive::theme::Apply(ImGui::GetStyle());
+    // Keyboard and pad drive every widget: d-pad or stick moves, A picks,
+    // B backs out; the App adds LB/RB for the rail. The SDL2 backend opens
+    // the first controller by itself.
+    io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard | ImGuiConfigFlags_NavEnableGamepad;
+    xlive::theme::Apply(ImGui::GetStyle(), ui_scale);
 
     launcher::Installer::GlobalInit();
     launcher::App app;
@@ -118,7 +131,8 @@ int main(int, char**) {
         std::fprintf(stderr, "[launcher] %s\n", error.c_str());
         return 1;
     }
-    app.fonts = xlive::theme::LoadFonts(io, app.config.font_size, app.config.font_path.c_str());
+    app.ui_scale = ui_scale;
+    app.fonts = xlive::theme::LoadFonts(io, app.config.font_size * ui_scale, app.config.font_path.c_str());
     app.images.Open(renderer, launcher::DataDir() / "launcher");
     app.images.set_server(app.config.server);
     app.tab = StartingTab();

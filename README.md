@@ -24,7 +24,15 @@ Built by one developer, with AI assistance. Free. No ads, no telemetry.
 | Windows 10/11 | `XenonLiveLauncher-windows-x86_64.zip` | unzip anywhere, run `xenonlive_launcher.exe` |
 | Linux | `XenonLiveLauncher-linux-x86_64.AppImage` | `chmod +x` it, run it (needs FUSE, like any AppImage) |
 | Linux, no FUSE | `XenonLiveLauncher-linux-x86_64.tar.zst` | unpack, run `XenonLiveLauncher/xenonlive_launcher` |
-| Steam Deck | the AppImage | add it as a non-Steam game |
+| Steam Deck | the AppImage | add it as a non-Steam game (below) |
+
+**On a Steam Deck**: in Desktop mode, `chmod +x` the AppImage and add it
+to Steam as a non-Steam game; it then runs from Game mode, full screen,
+with a larger UI, and the whole launcher works from the pad — the stick or
+d-pad moves, **A** picks, **B** goes back, **LB/RB** switch between the
+tabs on the left. Typing (a gamertag, a password, a message) uses the
+Deck's keyboard: **Steam + X**. The games' overlay works the same way
+(**View+Menu** opens it, LB/RB switch its tabs).
 
 Windows may show a SmartScreen warning the first time ("unknown publisher")
 — *More info → Run anyway*. The launcher is not signed; the `SHA256SUMS`

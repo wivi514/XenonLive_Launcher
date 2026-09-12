@@ -29,7 +29,8 @@ namespace launcher {
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
-// The rail's width; Frame paints its background before DrawRail draws on it.
+// The rail's width at scale 1; Frame paints its background before DrawRail
+// draws on it.
 inline constexpr float kRailWidth = 216.0f;
 
 enum class Tab { Home, Friends, Messages, Invites, Achievements, Issues, Support, Profile, Account };
@@ -66,6 +67,9 @@ public:
     ImageCache images;
     // Body, heading and title faces; loaded by main after the config.
     xlive::theme::Fonts fonts;
+    // The UI scale main chose (1.3 on a Steam Deck); the few fixed widths
+    // in the layout multiply by it.
+    float ui_scale = 1.0f;
     Tab tab = Tab::Home;
 
     // "We know who the player is" — the cached identity counts, so a saved

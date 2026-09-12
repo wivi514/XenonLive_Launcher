@@ -78,6 +78,9 @@ bool Row(App& app, const char* id, const char* heading, const std::string& sub, 
     } else if (hovered) {
         draw->AddRectFilled(pos, max, ImGui::GetColorU32(kPanelHi), 5.0f);
     }
+    if (ImGui::IsItemFocused() && !selected) {
+        draw->AddRect(pos, max, ImGui::GetColorU32(kLime), 5.0f, 0, 2.0f);
+    }
     ImGui::PushClipRect(pos, ImVec2(max.x - 6.0f, max.y), true);
     ImGui::PushFont(app.fonts.heading);
     draw->AddText(ImVec2(pos.x + 12.0f, pos.y + 6.0f), ImGui::GetColorU32(ImGuiCol_Text), heading);
@@ -233,7 +236,7 @@ void DrawIssues(App& app) {
 
     // -- left: captures, then reports ---------------------------------------
     ImGui::PushStyleColor(ImGuiCol_ChildBg, kPanel);
-    ImGui::BeginChild("issues_list", ImVec2(300.0f, 0.0f), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("issues_list", ImVec2(300.0f * app.ui_scale, 0.0f), ImGuiChildFlags_Borders);
     ImGui::PopStyleColor();
 
     ImGui::PushFont(app.fonts.heading);

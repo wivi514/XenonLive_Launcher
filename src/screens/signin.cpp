@@ -11,7 +11,7 @@ namespace launcher {
 
 void DrawSignIn(App& app) {
     const ImVec2 avail = ImGui::GetContentRegionAvail();
-    const float width = 420.0f;
+    const float width = 420.0f * app.ui_scale;
     ImGui::SetCursorPosX((avail.x - width) * 0.5f);
     // The taller forms start higher so they fit a small window whole.
     const bool tall = app.signin.mode != App::SignInState::Mode::SignIn;

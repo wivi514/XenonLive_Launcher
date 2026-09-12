@@ -57,6 +57,9 @@ bool DrawPerson(App& app, uint64_t xuid, const std::string& gamertag, const Mess
     } else if (hovered) {
         draw->AddRectFilled(pos, max, ImGui::GetColorU32(kPanelHi), 5.0f);
     }
+    if (ImGui::IsItemFocused() && !selected) {
+        draw->AddRect(pos, max, ImGui::GetColorU32(kLime), 5.0f, 0, 2.0f);
+    }
     // The dot, the name, the unread badge.
     draw->AddCircleFilled(ImVec2(pos.x + 14.0f, pos.y + 8.0f + app.fonts.heading->FontSize * 0.5f),
                           4.0f, ImGui::GetColorU32(online ? kLime : kMuted));
@@ -120,7 +123,7 @@ void DrawMessages(App& app) {
     if (!m.inbox_loaded && m.inbox_ticket == 0) app.RefreshInbox();
 
     // -- the people column --------------------------------------------------
-    ImGui::BeginChild("people", ImVec2(250.0f, 0.0f), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("people", ImVec2(250.0f * app.ui_scale, 0.0f), ImGuiChildFlags_Borders);
     xlive::theme::Section("Messages");
     const auto friends = app.client->friends();
     const auto find_friend = [&](uint64_t xuid) -> const xlive::Client::Friend* {
@@ -160,8 +163,10 @@ void DrawMessages(App& app) {
     ImGui::BeginGroup();
     if (m.peer == 0) {
         ImGui::Dummy(ImVec2(0.0f, 40.0f));
-        ImGui::TextDisabled("Pick someone to read your messages with them.");
-        ImGui::TextDisabled("A message is up to 256 characters; the last 20 between you are kept.");
+        ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+        ImGui::TextWrapped("Pick someone to read your messages with them. A message is up to 256 "
+                           "characters; the last 20 between you are kept.");
+        ImGui::PopStyleColor();
         ImGui::EndGroup();
         return;
     }

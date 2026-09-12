@@ -1198,6 +1198,36 @@ void App::Frame() {
     }
 
     const bool show_signin = !signed_in() || signin.ticket != 0 || adding_account;
+    // The pad's shoulder buttons step the rail; B leaves a page that has a
+    // parent (a friend's profile, the account screen) — unless a text box
+    // has the focus, where B is its cancel.
+    if (!show_signin) {
+        static const Tab kRail[] = {Tab::Home, Tab::Friends, Tab::Messages, Tab::Invites,
+                                    Tab::Achievements, Tab::Issues, Tab::Support};
+        const int n = int(sizeof(kRail) / sizeof(kRail[0]));
+        int at = 0;
+        for (int i = 0; i < n; ++i) {
+            if (kRail[i] == tab || (tab == Tab::Profile && kRail[i] == Tab::Friends)) at = i;
+        }
+        int step = 0;
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false)) step = -1;
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false)) step = 1;
+        if (step != 0) {
+            tab = kRail[(at + step + n) % n];
+            if (tab == Tab::Issues) {
+                RescanCaptures();
+                if (!issues.searched && issues.search_ticket == 0) SearchIssues();
+            }
+            if (tab == Tab::Achievements && !achievements.loaded && achievements.ticket == 0 &&
+                !config.titles.empty()) {
+                LoadAchievements(achievements.title_index < 0 ? 0 : achievements.title_index);
+            }
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false) && !ImGui::GetIO().WantTextInput) {
+            if (tab == Tab::Profile) tab = Tab::Friends;
+            else if (tab == Tab::Account) tab = Tab::Home;
+        }
+    }
     if (show_signin) {
         // The whole window is the content look: the gradient and the glow.
         xlive::theme::ContentBackground(viewport->WorkPos,
@@ -1208,8 +1238,8 @@ void App::Frame() {
         const ImVec2 origin = ImGui::GetCursorScreenPos();
         const ImVec2 end(viewport->WorkPos.x + viewport->WorkSize.x,
                          viewport->WorkPos.y + viewport->WorkSize.y);
-        xlive::theme::RailBackground(origin, ImVec2(origin.x + kRailWidth, end.y));
-        xlive::theme::ContentBackground(ImVec2(origin.x + kRailWidth, origin.y), end);
+        xlive::theme::RailBackground(origin, ImVec2(origin.x + kRailWidth * ui_scale, end.y));
+        xlive::theme::ContentBackground(ImVec2(origin.x + kRailWidth * ui_scale, origin.y), end);
         DrawRail();
         ImGui::SameLine(0.0f, 0.0f);
         DrawContent();
@@ -1224,7 +1254,7 @@ void App::DrawRail() {
     // The background was painted by Frame; the child is see-through.
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 16.0f));
-    ImGui::BeginChild("rail", ImVec2(kRailWidth, 0.0f), ImGuiChildFlags_None,
+    ImGui::BeginChild("rail", ImVec2(kRailWidth * ui_scale, 0.0f), ImGuiChildFlags_None,
                       ImGuiWindowFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();
 
