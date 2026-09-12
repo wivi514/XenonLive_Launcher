@@ -64,8 +64,9 @@ void LoadFont(ImGuiIO& io, const launcher::Config& config) {
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
 // in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
 // XENONLIVE_SCREENSHOT_MS moves the screenshot later than two seconds;
-// XENONLIVE_SWITCH=<xuid hex> presses Use on that saved account. None does
-// anything unless set.
+// XENONLIVE_SWITCH=<xuid hex> presses Use on that saved account;
+// XENONLIVE_PROFILE=<gamertag> opens that friend's profile page and presses
+// Compare on the first title. None does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
     SDL_GetRendererOutputSize(renderer, &w, &h);
@@ -149,6 +150,8 @@ int main(int, char**) {
         SDL_GetTicks() + (screenshot_ms ? Uint32(std::strtoul(screenshot_ms, nullptr, 10)) : 2000u);
     const char* install_key = std::getenv("XENONLIVE_INSTALL");
     const char* switch_xuid = std::getenv("XENONLIVE_SWITCH");
+    const char* profile_tag = std::getenv("XENONLIVE_PROFILE");
+    bool profile_compare = false;
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -190,6 +193,20 @@ int main(int, char**) {
                 std::fprintf(stderr, "[launcher] XENONLIVE_INSTALL: no such game %s\n", install_key);
             }
             install_key = nullptr;
+        }
+        if (profile_tag && app.signed_in() && app.client->online()) {
+            for (const auto& f : app.client->friends()) {
+                if (f.gamertag != profile_tag) continue;
+                app.OpenProfile(f.xuid, f.gamertag);
+                profile_tag = nullptr;
+                profile_compare = true;
+                break;
+            }
+        }
+        if (profile_compare && app.profile.card_loaded && app.profile.compare_title == 0 &&
+            !app.profile.card.card.titles.empty()) {
+            app.LoadCompare(app.profile.card.card.titles.front().title_id);
+            profile_compare = false;
         }
         if (accept && app.signed_in() && app.client->online()) {
             const auto inbox = app.client->invites();

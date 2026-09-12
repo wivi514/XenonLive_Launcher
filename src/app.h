@@ -25,7 +25,9 @@
 
 namespace launcher {
 
-enum class Tab { Home, Friends, Invites, Achievements };
+// Profile is not on the rail: it opens from a friend's row and Back returns
+// to Friends.
+enum class Tab { Home, Friends, Invites, Achievements, Profile };
 
 // A ticket the UI issued for a fire-and-forget action. Every one is collected
 // — the library holds a result until someone does — and a failure is toasted
@@ -107,6 +109,33 @@ public:
         bool loaded = false;
         std::string error;
     } achievements;
+
+    // A friend's profile page: their gamercard, and their achievements in a
+    // title next to this player's own.
+    struct ProfileState {
+        uint64_t xuid = 0;
+        // From the friends list, so the header has a name before the card
+        // arrives.
+        std::string gamertag;
+        xlive::Client::Ticket card_ticket = 0;
+        xlive::Client::GamercardResult card;
+        bool card_loaded = false;
+        std::string card_error;
+        // The comparison: the same title read twice, theirs and mine. Two
+        // tickets, one screen; it is shown once both have landed.
+        uint32_t compare_title = 0;
+        xlive::Client::Ticket theirs_ticket = 0;
+        xlive::Client::Ticket mine_ticket = 0;
+        xlive::Client::TitleInfo theirs;
+        xlive::Client::TitleInfo mine;
+        bool compare_loaded = false;
+        std::string compare_error;
+        // 0 every achievement, 1 only what they have and I do not, 2 the
+        // reverse.
+        int compare_filter = 0;
+    } profile;
+    void OpenProfile(uint64_t xuid, const std::string& gamertag);
+    void LoadCompare(uint32_t title_id);
 
     // Records a ticket to be collected. `what` names the action for the
     // failure toast ("Add friend", "Send invite").

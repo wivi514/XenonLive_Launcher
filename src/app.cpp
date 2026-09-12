@@ -264,6 +264,49 @@ void App::PollPending() {
         }
     }
 
+    if (profile.card_ticket != 0) {
+        xlive::Client::GamercardResult result;
+        const auto status = client->Poll(profile.card_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            profile.card_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                profile.card = std::move(result);
+                profile.card_loaded = true;
+                profile.card_error.clear();
+                if (!profile.card.card.gamertag.empty()) profile.gamertag = profile.card.card.gamertag;
+            } else {
+                profile.card_loaded = false;
+                profile.card_error = result.error.empty() ? "unknown" : result.error;
+            }
+        }
+    }
+    // The two halves of a comparison. Whichever fails first names the
+    // error; the other is forgotten rather than left to land on a screen
+    // that has moved on.
+    const auto poll_half = [&](xlive::Client::Ticket& ticket, xlive::Client::TitleInfo& into,
+                               xlive::Client::Ticket& other) {
+        if (ticket == 0) return;
+        xlive::Client::TitleResult result;
+        const auto status = client->Poll(ticket, result);
+        if (status == xlive::Client::OpStatus::Pending) return;
+        ticket = 0;
+        if (status == xlive::Client::OpStatus::Succeeded) {
+            into = std::move(result.title);
+            if (profile.theirs_ticket == 0 && profile.mine_ticket == 0 &&
+                profile.compare_error.empty()) {
+                profile.compare_loaded = true;
+            }
+        } else {
+            profile.compare_error = result.error.empty() ? "unknown" : result.error;
+            if (other != 0) {
+                client->Forget(other);
+                other = 0;
+            }
+        }
+    };
+    poll_half(profile.theirs_ticket, profile.theirs, profile.mine_ticket);
+    poll_half(profile.mine_ticket, profile.mine, profile.theirs_ticket);
+
     if (signin.ticket != 0) {
         xlive::Client::SocialResult result;
         const auto status = client->Poll(signin.ticket, result);
@@ -292,6 +335,31 @@ void App::LoadAchievements(int title_index) {
     achievements.loaded = false;
     achievements.error.clear();
     achievements.ticket = client->LoadTitle(config.titles[size_t(title_index)].title_id);
+}
+
+void App::OpenProfile(uint64_t xuid, const std::string& gamertag) {
+    if (!client || xuid == 0) return;
+    if (profile.card_ticket != 0) client->Forget(profile.card_ticket);
+    if (profile.theirs_ticket != 0) client->Forget(profile.theirs_ticket);
+    if (profile.mine_ticket != 0) client->Forget(profile.mine_ticket);
+    profile = ProfileState{};
+    profile.xuid = xuid;
+    profile.gamertag = gamertag;
+    profile.card_ticket = client->LoadGamercard(xuid);
+    tab = Tab::Profile;
+}
+
+void App::LoadCompare(uint32_t title_id) {
+    if (!client || profile.xuid == 0) return;
+    if (profile.theirs_ticket != 0) client->Forget(profile.theirs_ticket);
+    if (profile.mine_ticket != 0) client->Forget(profile.mine_ticket);
+    profile.compare_title = title_id;
+    profile.compare_loaded = false;
+    profile.compare_error.clear();
+    profile.theirs = xlive::Client::TitleInfo{};
+    profile.mine = xlive::Client::TitleInfo{};
+    profile.theirs_ticket = client->LoadPlayerTitle(profile.xuid, title_id);
+    profile.mine_ticket = client->LoadTitle(title_id);
 }
 
 // -- invites ------------------------------------------------------------------
@@ -533,6 +601,8 @@ void App::HandleEvent(const xlive::Event& event) {
                 friends.mine = xlive::Client::Presence{};
                 friends.mine_loaded = false;
                 achievements.loaded = false;
+                if (tab == Tab::Profile) tab = Tab::Friends;
+                profile = ProfileState{};
             }
             break;
 
@@ -673,7 +743,7 @@ void App::DrawRail() {
     ImGui::Spacing();
 
     const auto tab_button = [&](const char* label, Tab which) {
-        const bool selected = tab == which;
+        const bool selected = tab == which || (which == Tab::Friends && tab == Tab::Profile);
         if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
         if (ImGui::Button(label, ImVec2(-1.0f, 0.0f))) {
             tab = which;
@@ -720,6 +790,7 @@ void App::DrawContent() {
         case Tab::Friends:      DrawFriends(*this); break;
         case Tab::Invites:      DrawInvites(*this); break;
         case Tab::Achievements: DrawAchievements(*this); break;
+        case Tab::Profile:      DrawProfile(*this); break;
     }
     ImGui::EndChild();
 }

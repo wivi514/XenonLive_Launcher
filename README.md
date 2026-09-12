@@ -67,6 +67,14 @@ A single window with a rail of tabs:
   menus"). Add by gamertag, accept, decline, remove, block, and *Invite* —
   enabled once the game you are running is in a session, because an
   invitation names the session.
+- **A friend's profile** — from their name or *Profile* on the Friends tab:
+  gamerscore, country, member since, presence, the same Invite / Remove /
+  Accept buttons, and every title with how far they are in it. *Compare
+  achievements* on a title lists each achievement with their unlock date
+  next to yours, filterable to "only what they have and you don't" and the
+  reverse. The progress and the comparison are only there once they have
+  accepted you as a friend — the server's presence rule, applied to what a
+  player has done as well as where they are.
 - **Invites** — the inbox. *Accept* launches the title if it is not running;
   if it is, the server tells the running game and it joins from there.
 - **Achievements** — per installed title: the tile, name, the locked or
@@ -220,18 +228,17 @@ screen (the acceptance run in `PLAN.md` uses them):
 | `XENONLIVE_ACCEPT=1` | presses Accept on the first invitation in the inbox |
 | `XENONLIVE_INSTALL=case_west` | presses Install on that game |
 | `XENONLIVE_SWITCH=<xuid hex>` | presses Use on that saved account |
+| `XENONLIVE_PROFILE=<gamertag>` | opens that friend's profile and presses Compare on the first title |
 | `XENONLIVE_SCREENSHOT_MS=5000` | takes the screenshot later than two seconds |
 
 With `SDL_VIDEODRIVER=offscreen` the whole thing runs without a display.
 
 ## Not in v1, on purpose
 
-Leaderboards, gamerpics, a friend's profile page, settings
-beyond the server URL, Windows packaging, the Steam Deck
+Leaderboards, gamerpics, settings beyond the server URL, the Steam Deck
 tarball (the AppImage runs there too). Each is a tab or a file later; none
-changes the shape of what is here. `launch.cpp` has the `CreateProcessW`
-path and `archive.cpp` the zip path already; the zip path is tested here
-against the real Windows bundle, but neither has been built on Windows.
+changes the shape of what is here. The Windows build is cross-compiled by
+`tools/release_windows.sh` and has been run under wine, not on Windows.
 
 ## Layout
 
@@ -256,7 +263,7 @@ src/
   sha256.h / .cpp        SHA-256
   launch.h / launch.cpp  starting a title and noticing it stop
   toasts.h / toasts.cpp  notifications
-  screens/               one function per tab
+  screens/               one function per tab (profile.cpp is the friend page)
 tools/fetch_thirdparty.sh  re-vendors ImGui and miniz
 PLAN.md                  what this was built from
 ```

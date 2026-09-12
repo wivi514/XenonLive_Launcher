@@ -15,6 +15,8 @@ using Friend = xlive::Client::Friend;
 using Relation = xlive::Client::Relation;
 using PresenceState = xlive::Client::PresenceState;
 
+}  // namespace
+
 std::string PresenceLine(const xlive::Client::Presence& p) {
     switch (p.state) {
         case PresenceState::Offline: return "offline";
@@ -29,6 +31,8 @@ std::string PresenceLine(const xlive::Client::Presence& p) {
     return "";
 }
 
+namespace {
+
 void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
     ImGui::PushID(int(f.xuid & 0x7FFFFFFF));
     ImGui::PushID(int(f.xuid >> 32));
@@ -38,9 +42,16 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
     ImGui::TextColored(online ? ImVec4(0.45f, 0.85f, 0.45f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f),
                        "%s", online ? "*" : "o");
     ImGui::SameLine();
-    ImGui::Text("%s", f.gamertag.c_str());
+    // The name is the way in to their profile page.
+    if (ImGui::Selectable(f.gamertag.c_str(), false, ImGuiSelectableFlags_None,
+                          ImVec2(ImGui::CalcTextSize(f.gamertag.c_str()).x + 4.0f, 0.0f))) {
+        app.OpenProfile(f.xuid, f.gamertag);
+    }
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("View profile");
     ImGui::SameLine();
     ImGui::TextDisabled("%u G", f.gamerscore);
+    ImGui::SameLine();
+    if (ImGui::SmallButton("Profile")) app.OpenProfile(f.xuid, f.gamertag);
 
     switch (f.relation) {
         case Relation::Friend: {
