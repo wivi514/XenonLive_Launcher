@@ -16,6 +16,7 @@
 
 #include "accounts.h"
 #include "captures.h"
+#include "presence_announcer.h"
 #include "catalog.h"
 #include "config.h"
 #include "images.h"
@@ -302,6 +303,9 @@ private:
     std::deque<xlive::Event> events_;
 
     std::vector<xlive::Client::Friend> last_friends_;
+    // What has been said about each friend's whereabouts, so a blink of
+    // the gateway or a re-sent presence is not "is playing" again.
+    xlive::theme::PresenceAnnouncer presence_news_;
     // Who was signed in at the last frame, so a SigninChanged that ends a
     // session can name the saved account that lost its tokens.
     uint64_t last_xuid_ = 0;

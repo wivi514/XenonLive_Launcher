@@ -19,6 +19,7 @@
 #include <xlive/client.h>
 
 #include "imgui.h"
+#include "presence_announcer.h"
 #include "theme.h"
 #include "imgui_impl_vulkan.h"
 
@@ -152,6 +153,7 @@ struct Overlay::Impl {
     bool was_open = false;
     std::vector<Client::Friend> last_friends;
     bool friends_baseline = false;
+    xlive::theme::PresenceAnnouncer presence_news;
 
     // The achievements tab: the title's definitions and this player's
     // state, read once per opening (and again after an unlock), and the
@@ -717,16 +719,14 @@ void Overlay::Impl::DrainEvents(Client& c) {
                         for (const auto& old : last_friends) {
                             if (old.xuid == f.xuid) was = &old;
                         }
-                        if (f.presence.online() && (!was || !was->presence.online())) {
-                            Push(f.gamertag + (f.presence.state == Client::PresenceState::Playing
-                                                   ? " is playing " + f.presence.title_name
-                                                   : " is online"));
-                        }
                         if (f.relation == Client::Relation::RequestReceived &&
                             (!was || was->relation != Client::Relation::RequestReceived)) {
                             Push(f.gamertag + " wants to be your friend");
                         }
                     }
+                }
+                for (const auto& line : presence_news.Update(now, Now())) {
+                    Push(line.gamertag + " " + line.text);
                 }
                 last_friends = now;
                 friends_baseline = true;

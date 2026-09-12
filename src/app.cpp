@@ -132,6 +132,7 @@ void App::StartClient() {
     }
     last_friends_.clear();
     friends_baseline_ = false;
+    presence_news_.Reset();
     friends = FriendsState{};
     achievements = AchievementsState{};
     pending_.clear();
@@ -1050,6 +1051,7 @@ void App::HandleEvent(const xlive::Event& event) {
                 toasts.Push("Signed out: " + client->status(), 6.0);
                 last_friends_.clear();
                 friends_baseline_ = false;
+                presence_news_.Reset();
                 friends.mine = xlive::Client::Presence{};
                 friends.mine_loaded = false;
                 achievements.loaded = false;
@@ -1089,14 +1091,10 @@ void App::HandleEvent(const xlive::Event& event) {
                     } else if (f.relation == R::Friend && was && was->relation == R::RequestSent) {
                         toasts.Push(f.gamertag + " accepted your friend request");
                     }
-                    if (f.presence.online() && (!was || !was->presence.online())) {
-                        if (f.presence.state == xlive::Client::PresenceState::Playing) {
-                            toasts.Push(f.gamertag + " is playing " + f.presence.title_name);
-                        } else {
-                            toasts.Push(f.gamertag + " is online");
-                        }
-                    }
                 }
+            }
+            for (const auto& line : presence_news_.Update(now, ImGui::GetTime())) {
+                toasts.Push(line.gamertag + " " + line.text);
             }
             last_friends_ = now;
             friends_baseline_ = true;
