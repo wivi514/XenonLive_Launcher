@@ -50,9 +50,7 @@ void DrawLink(App& app, const Link& link) {
 }  // namespace
 
 void DrawSupport(App& app) {
-    ImGui::PushFont(app.fonts.title);
-    ImGui::TextColored(xlive::theme::kLime, "Support XenonLive");
-    ImGui::PopFont();
+    xlive::theme::PageHeader("Support XenonLive");
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(
         "XenonLive is a spare-time project by one developer, built with AI assistance: the ports, "

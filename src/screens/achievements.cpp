@@ -13,9 +13,14 @@ void DrawAchievements(App& app) {
         return;
     }
 
-    // The picker.
     int index = app.achievements.title_index < 0 ? 0 : app.achievements.title_index;
     if (index >= int(app.config.titles.size())) index = 0;
+    ImGui::BeginDisabled(app.achievements.ticket != 0);
+    const bool refresh = xlive::theme::PageHeader("Achievements", nullptr, "Refresh");
+    ImGui::EndDisabled();
+    if (refresh) app.LoadAchievements(index);
+
+    // The picker.
     ImGui::SetNextItemWidth(280.0f);
     if (ImGui::BeginCombo("##title", app.config.titles[size_t(index)].name.c_str())) {
         for (int i = 0; i < int(app.config.titles.size()); ++i) {
@@ -29,10 +34,6 @@ void DrawAchievements(App& app) {
         }
         ImGui::EndCombo();
     }
-    ImGui::SameLine();
-    ImGui::BeginDisabled(app.achievements.ticket != 0);
-    if (ImGui::SmallButton("Refresh")) app.LoadAchievements(index);
-    ImGui::EndDisabled();
     if (app.achievements.title_index < 0 && app.achievements.ticket == 0) {
         app.LoadAchievements(index);
     }
@@ -64,8 +65,16 @@ void DrawAchievements(App& app) {
     ImGui::PopFont();
     ImGui::TextDisabled("%u / %u G, %u of %zu unlocked", title.gamerscore, title.max_gamerscore,
                         unlocked, title.achievements.size());
+    // How far along, as a bar: the dashboard showed one per game.
+    {
+        char overlay[8] = {};
+        const float frac = title.achievements.empty()
+                               ? 0.0f
+                               : float(unlocked) / float(title.achievements.size());
+        ImGui::ProgressBar(frac, ImVec2(260.0f, 6.0f), overlay);
+    }
     ImGui::EndGroup();
-    ImGui::Separator();
+    ImGui::Spacing();
 
     const float tile = 64.0f;
     for (const xlive::Client::Achievement& a : title.achievements) {

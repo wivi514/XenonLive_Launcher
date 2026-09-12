@@ -139,28 +139,24 @@ void DrawCompare(App& app) {
 
 void DrawProfile(App& app) {
     App::ProfileState& p = app.profile;
-    if (ImGui::SmallButton("< Friends")) {
+    if (ImGui::TextLink("< Friends")) {
         app.tab = Tab::Friends;
         return;
     }
-    ImGui::SameLine();
-    ImGui::BeginDisabled(p.card_ticket != 0);
-    if (ImGui::SmallButton("Refresh")) {
-        const uint32_t compare = p.compare_title;
-        app.OpenProfile(p.xuid, p.gamertag);
-        if (compare) app.LoadCompare(compare);
-    }
-    ImGui::EndDisabled();
-    ImGui::Spacing();
 
     // -- the card -------------------------------------------------------------
     xlive::Client::Friend entry;
     const bool listed = app.client && app.client->FriendByXUID(p.xuid, entry);
     const bool is_friend = listed && entry.is_friend();
 
-    ImGui::PushFont(app.fonts.title);
-    ImGui::TextColored(xlive::theme::kLime, "%s", p.gamertag.c_str());
-    ImGui::PopFont();
+    ImGui::BeginDisabled(p.card_ticket != 0);
+    const bool refresh = xlive::theme::PageHeader(p.gamertag.c_str(), nullptr, "Refresh");
+    ImGui::EndDisabled();
+    if (refresh) {
+        const uint32_t compare = p.compare_title;
+        app.OpenProfile(p.xuid, p.gamertag);
+        if (compare) app.LoadCompare(compare);
+    }
     if (p.card_ticket != 0) {
         ImGui::TextDisabled("loading...");
     } else if (!p.card_error.empty()) {
@@ -193,7 +189,7 @@ void DrawProfile(App& app) {
             ImGui::SameLine();
             if (ImGui::SmallButton("Message")) app.OpenConversation(entry.xuid, entry.gamertag);
             ImGui::SameLine();
-            if (ImGui::SmallButton("Remove friend")) {
+            if (xlive::theme::SmallSecondaryButton("Remove friend")) {
                 app.Issue(app.client->RemoveFriend(entry.xuid), "Remove " + entry.gamertag);
             }
         } else if (listed && entry.relation == Relation::RequestReceived) {
@@ -201,13 +197,13 @@ void DrawProfile(App& app) {
                 app.Issue(app.client->AddFriend(entry.xuid), "Accept " + entry.gamertag);
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Decline")) {
+            if (xlive::theme::SmallSecondaryButton("Decline")) {
                 app.Issue(app.client->RemoveFriend(entry.xuid), "Decline " + entry.gamertag);
             }
         } else if (listed && entry.relation == Relation::RequestSent) {
             ImGui::TextDisabled("friend request sent");
             ImGui::SameLine();
-            if (ImGui::SmallButton("Withdraw")) {
+            if (xlive::theme::SmallSecondaryButton("Withdraw")) {
                 app.Issue(app.client->RemoveFriend(entry.xuid), "Withdraw " + entry.gamertag);
             }
         } else if (p.xuid != app.client->identity().xuid) {

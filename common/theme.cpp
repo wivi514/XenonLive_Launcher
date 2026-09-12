@@ -1,5 +1,6 @@
 #include "theme.h"
 
+#include <algorithm>
 #include <cstdio>
 #include <cstring>
 
@@ -8,6 +9,8 @@
 namespace xlive::theme {
 
 namespace {
+
+constexpr float kPi = 3.14159265f;
 
 ImU32 Col(const ImVec4& v, float alpha = 1.0f) {
     return ImGui::GetColorU32(ImVec4(v.x, v.y, v.z, v.w * alpha));
@@ -20,17 +23,17 @@ Fonts g_fonts;
 void Apply(ImGuiStyle& style, float scale, float bg_alpha) {
     ImGui::StyleColorsDark(&style);
     style.WindowPadding = ImVec2(16.0f, 14.0f);
-    style.FramePadding = ImVec2(10.0f, 6.0f);
+    style.FramePadding = ImVec2(11.0f, 6.0f);
     style.ItemSpacing = ImVec2(8.0f, 7.0f);
     style.ItemInnerSpacing = ImVec2(6.0f, 4.0f);
     style.WindowRounding = 8.0f;
     style.ChildRounding = 6.0f;
-    style.FrameRounding = 5.0f;
+    style.FrameRounding = 6.0f;
     style.PopupRounding = 6.0f;
     style.GrabRounding = 5.0f;
     style.TabRounding = 5.0f;
     style.ScrollbarRounding = 6.0f;
-    style.ScrollbarSize = 12.0f;
+    style.ScrollbarSize = 9.0f;
     style.WindowBorderSize = 0.0f;
     style.ChildBorderSize = 1.0f;
     style.FrameBorderSize = 0.0f;
@@ -46,9 +49,10 @@ void Apply(ImGuiStyle& style, float scale, float bg_alpha) {
     c[ImGuiCol_PopupBg] = ImVec4(kPanel.x, kPanel.y, kPanel.z, 0.98f);
     c[ImGuiCol_Border] = kBorder;
     c[ImGuiCol_BorderShadow] = ImVec4(0, 0, 0, 0);
-    c[ImGuiCol_FrameBg] = kPanelHi;
-    c[ImGuiCol_FrameBgHovered] = ImVec4(0.19f, 0.205f, 0.22f, 1.0f);
-    c[ImGuiCol_FrameBgActive] = ImVec4(0.23f, 0.25f, 0.27f, 1.0f);
+    // Inputs sit a shade below the panel they are on, like a slot.
+    c[ImGuiCol_FrameBg] = ImVec4(0.075f, 0.082f, 0.09f, 1.0f);
+    c[ImGuiCol_FrameBgHovered] = ImVec4(0.10f, 0.11f, 0.12f, 1.0f);
+    c[ImGuiCol_FrameBgActive] = ImVec4(0.11f, 0.125f, 0.135f, 1.0f);
     c[ImGuiCol_TitleBg] = kRail;
     c[ImGuiCol_TitleBgActive] = kRail;
     c[ImGuiCol_MenuBarBg] = kRail;
@@ -134,9 +138,9 @@ void Section(const char* label) {
     ImGui::Dummy(ImVec2(0.0f, 4.0f));
 }
 
-bool RailItem(const char* label, bool selected, const char* badge) {
+bool RailItem(const char* label, bool selected, const char* badge, Icon icon) {
     const ImGuiStyle& style = ImGui::GetStyle();
-    const float height = ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f + 6.0f;
+    const float height = ImGui::GetTextLineHeight() + style.FramePadding.y * 2.0f + 8.0f;
     const ImVec2 pos = ImGui::GetCursorScreenPos();
     const float width = ImGui::GetContentRegionAvail().x;
     ImGui::PushID(label);
@@ -159,8 +163,16 @@ bool RailItem(const char* label, bool selected, const char* badge) {
     if (ImGui::IsItemFocused() && !selected) {
         draw->AddRect(pos, max, Col(kLime, 0.6f), style.FrameRounding);
     }
-    const ImVec2 text_pos(pos.x + 14.0f, pos.y + (height - ImGui::GetTextLineHeight()) * 0.5f);
-    draw->AddText(text_pos, selected ? IM_COL32_WHITE : Col(hovered ? kText : kMuted), label);
+    const ImU32 ink = selected ? IM_COL32_WHITE : Col(hovered ? kText : kMuted);
+    float text_x = pos.x + 14.0f;
+    if (icon != Icon::None) {
+        const float box = ImGui::GetTextLineHeight() * 0.95f;
+        DrawIcon(draw, icon, ImVec2(pos.x + 14.0f + box * 0.5f, pos.y + height * 0.5f), box,
+                 selected ? IM_COL32_WHITE : Col(hovered ? kText : kLime, hovered ? 1.0f : 0.8f));
+        text_x += box + 10.0f;
+    }
+    const ImVec2 text_pos(text_x, pos.y + (height - ImGui::GetTextLineHeight()) * 0.5f);
+    draw->AddText(text_pos, ink, label);
     if (badge && *badge) {
         ImGui::PushFont(g_fonts.body);
         const ImVec2 size = ImGui::CalcTextSize(badge);
@@ -214,6 +226,170 @@ bool Gamercard(const char* gamertag, unsigned gamerscore, bool online, const cha
         draw->AddText(ImVec2(pos.x + pad + r * 2.0f + 6.0f, y), IM_COL32(235, 245, 230, 230), status);
     }
     return clicked;
+}
+
+
+// -- icons ---------------------------------------------------------------------
+
+void DrawIcon(ImDrawList* draw, Icon icon, ImVec2 c, float size, ImU32 col) {
+    const float s = size * 0.5f;  // half-box
+    const float t = std::max(1.4f, size * 0.11f);  // stroke
+    switch (icon) {
+    case Icon::None:
+        break;
+    case Icon::Home: {
+        // A roof over a body, a door in it.
+        const ImVec2 roof[] = {ImVec2(c.x - s, c.y), ImVec2(c.x, c.y - s), ImVec2(c.x + s, c.y)};
+        draw->AddPolyline(roof, 3, col, ImDrawFlags_None, t);
+        draw->AddRect(ImVec2(c.x - s * 0.7f, c.y - s * 0.05f), ImVec2(c.x + s * 0.7f, c.y + s),
+                      col, 0.0f, 0, t);
+        draw->AddRectFilled(ImVec2(c.x - s * 0.18f, c.y + s * 0.35f), ImVec2(c.x + s * 0.18f, c.y + s), col);
+        break;
+    }
+    case Icon::Friends: {
+        // Two people, one a little behind the other.
+        const float r = s * 0.32f;
+        draw->AddCircle(ImVec2(c.x + s * 0.3f, c.y - s * 0.35f), r, col, 0, t);
+        draw->AddCircleFilled(ImVec2(c.x - s * 0.3f, c.y - s * 0.3f), r, col);
+        draw->PathArcTo(ImVec2(c.x - s * 0.3f, c.y + s * 0.85f), s * 0.62f, kPi, 2.0f * kPi, 12);
+        draw->PathFillConvex(col);
+        draw->PathArcTo(ImVec2(c.x + s * 0.3f, c.y + s * 0.85f), s * 0.62f, kPi * 1.15f, 2.0f * kPi, 10);
+        draw->PathStroke(col, ImDrawFlags_None, t);
+        break;
+    }
+    case Icon::Messages: {
+        // A speech bubble.
+        draw->AddRect(ImVec2(c.x - s, c.y - s * 0.8f), ImVec2(c.x + s, c.y + s * 0.4f), col, s * 0.35f, 0, t);
+        const ImVec2 tail[] = {ImVec2(c.x - s * 0.5f, c.y + s * 0.4f), ImVec2(c.x - s * 0.6f, c.y + s),
+                               ImVec2(c.x - s * 0.05f, c.y + s * 0.4f)};
+        draw->AddConvexPolyFilled(tail, 3, col);
+        break;
+    }
+    case Icon::Invites: {
+        // An envelope.
+        draw->AddRect(ImVec2(c.x - s, c.y - s * 0.7f), ImVec2(c.x + s, c.y + s * 0.7f), col, s * 0.15f, 0, t);
+        const ImVec2 flap[] = {ImVec2(c.x - s, c.y - s * 0.6f), ImVec2(c.x, c.y + s * 0.15f),
+                               ImVec2(c.x + s, c.y - s * 0.6f)};
+        draw->AddPolyline(flap, 3, col, ImDrawFlags_None, t);
+        break;
+    }
+    case Icon::Achievements: {
+        // A trophy: cup, handles, stem, base.
+        draw->AddRectFilled(ImVec2(c.x - s * 0.55f, c.y - s), ImVec2(c.x + s * 0.55f, c.y + s * 0.15f), col, s * 0.3f,
+                            ImDrawFlags_RoundCornersBottom);
+        draw->PathArcTo(ImVec2(c.x - s * 0.7f, c.y - s * 0.55f), s * 0.35f, kPi * 0.5f, kPi * 1.5f, 8);
+        draw->PathStroke(col, ImDrawFlags_None, t);
+        draw->PathArcTo(ImVec2(c.x + s * 0.7f, c.y - s * 0.55f), s * 0.35f, -kPi * 0.5f, kPi * 0.5f, 8);
+        draw->PathStroke(col, ImDrawFlags_None, t);
+        draw->AddRectFilled(ImVec2(c.x - s * 0.12f, c.y + s * 0.15f), ImVec2(c.x + s * 0.12f, c.y + s * 0.6f), col);
+        draw->AddRectFilled(ImVec2(c.x - s * 0.5f, c.y + s * 0.6f), ImVec2(c.x + s * 0.5f, c.y + s), col, s * 0.1f);
+        break;
+    }
+    case Icon::Issues: {
+        // A bug: body, head, three legs a side.
+        draw->AddEllipseFilled(ImVec2(c.x, c.y + s * 0.15f), ImVec2(s * 0.5f, s * 0.7f), col);
+        draw->AddCircleFilled(ImVec2(c.x, c.y - s * 0.65f), s * 0.3f, col);
+        for (int i = 0; i < 3; ++i) {
+            const float y = c.y - s * 0.25f + i * s * 0.4f;
+            draw->AddLine(ImVec2(c.x - s * 0.45f, y), ImVec2(c.x - s, y + s * 0.15f), col, t);
+            draw->AddLine(ImVec2(c.x + s * 0.45f, y), ImVec2(c.x + s, y + s * 0.15f), col, t);
+        }
+        break;
+    }
+    case Icon::Support: {
+        // A heart.
+        const float r = s * 0.48f;
+        draw->AddCircleFilled(ImVec2(c.x - r, c.y - s * 0.3f), r, col);
+        draw->AddCircleFilled(ImVec2(c.x + r, c.y - s * 0.3f), r, col);
+        const ImVec2 tip[] = {ImVec2(c.x - s * 0.95f, c.y - s * 0.1f), ImVec2(c.x + s * 0.95f, c.y - s * 0.1f),
+                              ImVec2(c.x, c.y + s)};
+        draw->AddConvexPolyFilled(tip, 3, col);
+        break;
+    }
+    case Icon::Account: {
+        draw->AddCircle(ImVec2(c.x, c.y - s * 0.4f), s * 0.42f, col, 0, t);
+        draw->PathArcTo(ImVec2(c.x, c.y + s * 1.05f), s * 0.85f, kPi * 1.12f, kPi * 1.88f, 12);
+        draw->PathStroke(col, ImDrawFlags_None, t);
+        break;
+    }
+    }
+}
+
+// -- page furniture ----------------------------------------------------------------
+
+bool PageHeader(const char* title, const char* subtitle, const char* button) {
+    ImGui::PushFont(g_fonts.title);
+    ImGui::TextUnformatted(title);
+    ImGui::PopFont();
+    const float title_h = ImGui::GetItemRectSize().y;
+    if (subtitle && *subtitle) {
+        ImGui::SameLine(0.0f, 12.0f);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(kMuted, "%s", subtitle);
+    }
+    bool clicked = false;
+    if (button && *button) {
+        const float w = ImGui::CalcTextSize(button).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+        ImGui::SameLine(ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - w);
+        const float y = ImGui::GetCursorPosY();
+        ImGui::SetCursorPosY(y + (title_h - ImGui::GetFrameHeight()) * 0.5f);
+        clicked = SmallSecondaryButton(button);
+    }
+    const float y = ImGui::GetCursorScreenPos().y + 2.0f;
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const float left = ImGui::GetCursorScreenPos().x;
+    const float right = left + ImGui::GetContentRegionAvail().x;
+    draw->AddLine(ImVec2(left, y), ImVec2(left + 46.0f, y), Col(kLime), 2.0f);
+    draw->AddLine(ImVec2(left + 46.0f, y), ImVec2(right, y), Col(kBorder), 1.0f);
+    ImGui::Dummy(ImVec2(0.0f, 8.0f));
+    return clicked;
+}
+
+bool SecondaryButton(const char* label, const ImVec2& size) {
+    ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.24f, 0.26f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kGreen);
+    const bool clicked = ImGui::Button(label, size);
+    ImGui::PopStyleColor(3);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), Col(kBorder),
+                  ImGui::GetStyle().FrameRounding);
+    return clicked;
+}
+
+bool SmallSecondaryButton(const char* label) {
+    ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.24f, 0.26f, 1.0f));
+    ImGui::PushStyleColor(ImGuiCol_ButtonActive, kGreen);
+    const bool clicked = ImGui::SmallButton(label);
+    ImGui::PopStyleColor(3);
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    draw->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(), Col(kBorder),
+                  ImGui::GetStyle().FrameRounding);
+    return clicked;
+}
+
+void RailBackground(ImVec2 min, ImVec2 max) {
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImU32 top = Col(kRail);
+    const ImU32 bottom = Col(ImVec4(kRail.x * 0.7f, kRail.y * 0.7f, kRail.z * 0.7f, 1.0f));
+    draw->AddRectFilledMultiColor(min, max, top, top, bottom, bottom);
+    draw->AddLine(ImVec2(max.x - 0.5f, min.y), ImVec2(max.x - 0.5f, max.y), Col(kBorder, 0.8f));
+}
+
+void ContentBackground(ImVec2 min, ImVec2 max) {
+    ImDrawList* draw = ImGui::GetWindowDrawList();
+    const ImU32 top = Col(ImVec4(kBg.x * 1.55f, kBg.y * 1.55f, kBg.z * 1.55f, 1.0f));
+    const ImU32 bottom = Col(kBg);
+    draw->AddRectFilledMultiColor(min, max, top, top, bottom, bottom);
+    // The glow: a stack of ever-smaller, ever-fainter discs. Cheap, and
+    // reads as a soft light behind the top-left of the page.
+    const ImVec2 at(min.x + 40.0f, min.y - 60.0f);
+    const float reach = std::min(max.x - min.x, max.y - min.y) * 0.9f;
+    for (int i = 0; i < 7; ++i) {
+        const float r = reach * (1.0f - i * 0.13f);
+        draw->AddCircleFilled(at, r, IM_COL32(60, 139, 42, 5), 48);
+    }
 }
 
 void GlossLastItem() {

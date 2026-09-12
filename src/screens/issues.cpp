@@ -224,6 +224,7 @@ void DrawReportDetail(App& app, const Issue& is) {
 
 void DrawIssues(App& app) {
     auto& st = app.issues;
+    if (xlive::theme::PageHeader("Issues", "bug reports", "Rescan")) app.RescanCaptures();
     // Opened by a hook rather than the blade, or opened before the client
     // was online: the first search still happens.
     if (!st.searched && st.search_ticket == 0 && app.client && app.client->online()) {
@@ -238,8 +239,6 @@ void DrawIssues(App& app) {
     ImGui::PushFont(app.fonts.heading);
     ImGui::TextColored(kLime, "Your captures");
     ImGui::PopFont();
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x + ImGui::GetCursorPosX() - 60.0f);
-    if (ImGui::SmallButton("Rescan")) app.RescanCaptures();
     if (st.captures.empty()) {
         ImGui::TextDisabled("none");
         ImGui::PushStyleColor(ImGuiCol_Text, kMuted);

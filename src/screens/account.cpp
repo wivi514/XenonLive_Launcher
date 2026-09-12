@@ -40,12 +40,11 @@ void DrawAccount(App& app) {
     auto& st = app.account;
     const xlive::Identity id = app.client->identity();
 
-    ImGui::PushFont(app.fonts.title);
-    ImGui::TextColored(kLime, "%s", id.gamertag.c_str());
-    ImGui::PopFont();
-    ImGui::TextDisabled("%u G   %s", id.gamerscore, app.client->status().c_str());
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60.0f);
-    if (ImGui::SmallButton("Sign out")) app.SignOut();
+    {
+        char sub[64];
+        std::snprintf(sub, sizeof(sub), "%u G   your account", id.gamerscore);
+        if (xlive::theme::PageHeader(id.gamertag.c_str(), sub, "Sign out")) app.SignOut();
+    }
     ImGui::Spacing();
 
     const float box = 360.0f;

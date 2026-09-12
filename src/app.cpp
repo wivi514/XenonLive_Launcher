@@ -1071,8 +1071,11 @@ void App::Frame() {
                                    ImGuiWindowFlags_NoNavFocus | ImGuiWindowFlags_NoSavedSettings;
     ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
     ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
+    // No padding of its own: the rail and the content each bring theirs,
+    // and the painted backgrounds reach the window's edge.
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
     ImGui::Begin("XenonLive", nullptr, flags);
-    ImGui::PopStyleVar(2);
+    ImGui::PopStyleVar(3);
 
     // The active account's saved copy follows session.json — the library
     // rotates the tokens in it — except while a sign-in is in flight, when
@@ -1098,10 +1101,19 @@ void App::Frame() {
 
     const bool show_signin = !signed_in() || signin.ticket != 0 || adding_account;
     if (show_signin) {
+        // The whole window is the content look: the gradient and the glow.
+        xlive::theme::ContentBackground(viewport->WorkPos,
+                                        ImVec2(viewport->WorkPos.x + viewport->WorkSize.x,
+                                               viewport->WorkPos.y + viewport->WorkSize.y));
         DrawSignIn(*this);
     } else {
+        const ImVec2 origin = ImGui::GetCursorScreenPos();
+        const ImVec2 end(viewport->WorkPos.x + viewport->WorkSize.x,
+                         viewport->WorkPos.y + viewport->WorkSize.y);
+        xlive::theme::RailBackground(origin, ImVec2(origin.x + kRailWidth, end.y));
+        xlive::theme::ContentBackground(ImVec2(origin.x + kRailWidth, origin.y), end);
         DrawRail();
-        ImGui::SameLine();
+        ImGui::SameLine(0.0f, 0.0f);
         DrawContent();
     }
     ImGui::End();
@@ -1111,9 +1123,10 @@ void App::Frame() {
 
 void App::DrawRail() {
     namespace theme = xlive::theme;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::kRail);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 14.0f));
-    ImGui::BeginChild("rail", ImVec2(210.0f, 0.0f), ImGuiChildFlags_None,
+    // The background was painted by Frame; the child is see-through.
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 16.0f));
+    ImGui::BeginChild("rail", ImVec2(kRailWidth, 0.0f), ImGuiChildFlags_None,
                       ImGuiWindowFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();
 
@@ -1125,9 +1138,10 @@ void App::DrawRail() {
     ImGui::PopFont();
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
 
-    const auto blade = [&](const char* label, Tab which, const char* badge = nullptr) {
+    const auto blade = [&](const char* label, Tab which, theme::Icon icon,
+                           const char* badge = nullptr) {
         const bool selected = tab == which || (which == Tab::Friends && tab == Tab::Profile);
-        if (theme::RailItem(label, selected, badge)) {
+        if (theme::RailItem(label, selected, badge, icon)) {
             tab = which;
             if (which == Tab::Achievements && !achievements.loaded && achievements.ticket == 0 &&
                 !config.titles.empty()) {
@@ -1139,24 +1153,24 @@ void App::DrawRail() {
             }
         }
     };
-    blade("Home", Tab::Home);
-    blade("Friends", Tab::Friends);
+    blade("Home", Tab::Home, theme::Icon::Home);
+    blade("Friends", Tab::Friends, theme::Icon::Friends);
     char unread[16] = {};
     if (unread_messages() > 0) std::snprintf(unread, sizeof(unread), "%d", unread_messages());
-    blade("Messages", Tab::Messages, unread);
+    blade("Messages", Tab::Messages, theme::Icon::Messages, unread);
     const size_t inbox = client ? client->invites().size() : 0;
     char badge[16] = {};
     if (inbox > 0) std::snprintf(badge, sizeof(badge), "%zu", inbox);
-    blade("Invites", Tab::Invites, badge);
-    blade("Achievements", Tab::Achievements);
+    blade("Invites", Tab::Invites, theme::Icon::Invites, badge);
+    blade("Achievements", Tab::Achievements, theme::Icon::Achievements);
     // Captures waiting for a decision. Scanned once at start and whenever
     // the tab opens; a port writing one while the launcher sits open is
     // seen on the next open or Rescan.
     if (!issues.scanned) RescanCaptures();
     char waiting[16] = {};
     if (!issues.captures.empty()) std::snprintf(waiting, sizeof(waiting), "%zu", issues.captures.size());
-    blade("Issues", Tab::Issues, waiting);
-    blade("Support", Tab::Support);
+    blade("Issues", Tab::Issues, theme::Icon::Issues, waiting);
+    blade("Support", Tab::Support, theme::Icon::Support);
 
     // The gamercard, at the bottom.
     const float card_h = fonts.heading->FontSize + ImGui::GetTextLineHeight() * 2.0f + 26.0f;
@@ -1172,8 +1186,8 @@ void App::DrawRail() {
 }
 
 void App::DrawContent() {
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, xlive::theme::kBg);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 14.0f));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 18.0f));
     ImGui::BeginChild("content", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();

@@ -8,9 +8,12 @@ namespace launcher {
 
 void DrawInvites(App& app) {
     const auto inbox = app.client->invites();
-    xlive::theme::Section("Invitations");
+    xlive::theme::PageHeader("Invitations", inbox.empty() ? "nothing waiting" : nullptr);
     if (inbox.empty()) {
-        ImGui::TextDisabled("Nothing waiting.");
+        ImGui::PushStyleColor(ImGuiCol_Text, xlive::theme::kMuted);
+        ImGui::TextWrapped("When a friend invites you into their game it lands here, and as a "
+                           "notification. Accept starts the game if it is not running.");
+        ImGui::PopStyleColor();
         return;
     }
     for (const xlive::Client::Invite& invite : inbox) {
@@ -31,7 +34,7 @@ void DrawInvites(App& app) {
 
         if (ImGui::Button("Accept")) app.AcceptInvite(invite);
         ImGui::SameLine();
-        if (ImGui::Button("Decline")) app.DeclineInvite(invite.id);
+        if (xlive::theme::SecondaryButton("Decline")) app.DeclineInvite(invite.id);
         ImGui::EndChild();
         ImGui::PopID();
     }

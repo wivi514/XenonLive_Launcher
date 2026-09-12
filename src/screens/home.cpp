@@ -77,7 +77,7 @@ void DrawGame(App& app, const CatalogGame& game) {
             ImGui::ProgressBar(-1.0f * float(ImGui::GetTime()), ImVec2(-100.0f, 0.0f), phase);
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("Cancel")) app.installer.Cancel();
+        if (xlive::theme::SmallSecondaryButton("Cancel")) app.installer.Cancel();
     } else if (!entry) {
         ImGui::TextDisabled("not installed");
         if (latest != app.latest_tags.end()) {
@@ -139,17 +139,17 @@ void DrawGame(App& app, const CatalogGame& game) {
         if (update_available) {
             if (ImGui::Button(("Update to " + latest->second).c_str())) app.InstallGame(game);
         } else {
-            if (ImGui::SmallButton("Reinstall")) app.InstallGame(game);
+            if (xlive::theme::SmallSecondaryButton("Reinstall")) app.InstallGame(game);
         }
         ImGui::SameLine();
-        if (ImGui::SmallButton("Folder")) OpenFolder(entry->cwd);
+        if (xlive::theme::SmallSecondaryButton("Folder")) OpenFolder(entry->cwd);
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Check for updates")) app.CheckGame(game);
+    if (xlive::theme::SmallSecondaryButton("Check for updates")) app.CheckGame(game);
     const auto page = app.release_pages.find(game.key);
     if (page != app.release_pages.end() && !page->second.empty()) {
         ImGui::SameLine();
-        if (ImGui::SmallButton("Release notes")) SDL_OpenURL(page->second.c_str());
+        if (xlive::theme::SmallSecondaryButton("Release notes")) SDL_OpenURL(page->second.c_str());
     }
     ImGui::EndDisabled();
     ImGui::EndGroup();
@@ -173,11 +173,11 @@ void DrawHome(App& app) {
     ImGui::TextDisabled("%s", app.client->gateway_connected() ? "live updates on"
                                                                : "live updates off");
     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 262.0f);
-    if (ImGui::SmallButton("Account")) app.OpenAccount();
+    if (xlive::theme::SmallSecondaryButton("Account")) app.OpenAccount();
     ImGui::SameLine();
-    if (ImGui::SmallButton("Switch account")) ImGui::OpenPopup("switch");
+    if (xlive::theme::SmallSecondaryButton("Switch account")) ImGui::OpenPopup("switch");
     ImGui::SameLine();
-    if (ImGui::SmallButton("Sign out")) app.SignOut();
+    if (xlive::theme::SmallSecondaryButton("Sign out")) app.SignOut();
     if (ImGui::BeginPopup("switch")) {
         for (const SavedAccount& account : app.accounts.list()) {
             if (account.xuid == id.xuid) continue;

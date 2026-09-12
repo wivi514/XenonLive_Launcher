@@ -29,6 +29,9 @@ namespace launcher {
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
+// The rail's width; Frame paints its background before DrawRail draws on it.
+inline constexpr float kRailWidth = 216.0f;
+
 enum class Tab { Home, Friends, Messages, Invites, Achievements, Issues, Support, Profile, Account };
 
 // A ticket the UI issued for a fire-and-forget action. Every one is collected

@@ -28,7 +28,7 @@ void DrawSignIn(App& app) {
     ImGui::PopFont();
     if (app.adding_account) {
         ImGui::SameLine(width - 80.0f);
-        if (ImGui::SmallButton("Back")) app.adding_account = false;
+        if (xlive::theme::SmallSecondaryButton("Back")) app.adding_account = false;
     }
     ImGui::Separator();
     ImGui::Spacing();
@@ -70,7 +70,7 @@ void DrawSignIn(App& app) {
                 }
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Forget")) forget = account.xuid;
+            if (xlive::theme::SmallSecondaryButton("Forget")) forget = account.xuid;
             ImGui::EndDisabled();
             ImGui::EndChild();
             ImGui::PopID();
@@ -202,7 +202,7 @@ void DrawSignIn(App& app) {
                       app.client->ResetPassword(st.gamertag, st.code, st.password));
             }
             ImGui::SameLine();
-            if (ImGui::Button("Send another code", ImVec2(-1.0f, 0.0f)) && app.client) {
+            if (xlive::theme::SecondaryButton("Send another code", ImVec2(-1.0f, 0.0f)) && app.client) {
                 std::memset(st.code, 0, sizeof(st.code));
                 start(Pending::Forgot, app.client->ForgotPassword(st.gamertag));
             }
@@ -222,11 +222,11 @@ void DrawSignIn(App& app) {
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::InputText("##server", app.signin.server, sizeof(app.signin.server));
         if (app.client && std::string(app.signin.server) != app.config.server) {
-            if (ImGui::SmallButton("Use this server")) app.RestartClient();
+            if (xlive::theme::SmallSecondaryButton("Use this server")) app.RestartClient();
             ImGui::SameLine();
         }
         if (std::string(app.signin.server) != kDefaultServer) {
-            if (ImGui::SmallButton("Back to the default")) {
+            if (xlive::theme::SmallSecondaryButton("Back to the default")) {
                 std::snprintf(app.signin.server, sizeof(app.signin.server), "%s", kDefaultServer);
                 if (app.config.server != kDefaultServer) app.RestartClient();
             }

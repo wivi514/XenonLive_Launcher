@@ -177,7 +177,7 @@ void DrawMessages(App& app) {
         ImGui::TextDisabled("not a friend any more; you can read, not write");
     }
     ImGui::SameLine();
-    if (ImGui::SmallButton("Profile")) app.OpenProfile(m.peer, m.peer_gamertag);
+    if (xlive::theme::SmallSecondaryButton("Profile")) app.OpenProfile(m.peer, m.peer_gamertag);
 
     // The log fills what the input box leaves.
     const float input_height = ImGui::GetTextLineHeight() * 3.0f + 24.0f + ImGui::GetFrameHeight();

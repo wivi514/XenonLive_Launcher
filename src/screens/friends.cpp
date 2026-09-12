@@ -60,7 +60,7 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
     ImGui::SameLine();
     ImGui::TextDisabled("%u G", f.gamerscore);
     ImGui::SameLine();
-    if (ImGui::SmallButton("Profile")) app.OpenProfile(f.xuid, f.gamertag);
+    if (xlive::theme::SmallSecondaryButton("Profile")) app.OpenProfile(f.xuid, f.gamertag);
 
     switch (f.relation) {
         case Relation::Friend: {
@@ -79,11 +79,11 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
             ImGui::SameLine();
             if (ImGui::SmallButton("Message")) app.OpenConversation(f.xuid, f.gamertag);
             ImGui::SameLine();
-            if (ImGui::SmallButton("Remove")) {
+            if (xlive::theme::SmallSecondaryButton("Remove")) {
                 app.Issue(app.client->RemoveFriend(f.xuid), "Remove " + f.gamertag);
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Block")) {
+            if (xlive::theme::SmallSecondaryButton("Block")) {
                 app.Issue(app.client->BlockPlayer(f.xuid), "Block " + f.gamertag);
             }
             break;
@@ -95,17 +95,17 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
                 app.Issue(app.client->AddFriend(f.xuid), "Accept " + f.gamertag);
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Decline")) {
+            if (xlive::theme::SmallSecondaryButton("Decline")) {
                 app.Issue(app.client->RemoveFriend(f.xuid), "Decline " + f.gamertag);
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Block")) {
+            if (xlive::theme::SmallSecondaryButton("Block")) {
                 app.Issue(app.client->BlockPlayer(f.xuid), "Block " + f.gamertag);
             }
             break;
         case Relation::RequestSent:
             ImGui::TextDisabled("request sent");
-            if (ImGui::SmallButton("Withdraw")) {
+            if (xlive::theme::SmallSecondaryButton("Withdraw")) {
                 app.Issue(app.client->RemoveFriend(f.xuid), "Withdraw " + f.gamertag);
             }
             break;
@@ -125,7 +125,20 @@ void DrawFriends(App& app) {
         app.friends.open = true;
         app.RefreshMyPresence();
     }
-    // -- add by gamertag ------------------------------------------------------
+    // -- the header, with the add box at its right --------------------------
+    {
+        int online = 0;
+        for (const Friend& f : app.client->friends()) {
+            if (f.is_friend() && f.presence.online()) ++online;
+        }
+        char sub[48];
+        std::snprintf(sub, sizeof(sub), "%d online", online);
+        if (xlive::theme::PageHeader("Friends", sub, "Refresh")) {
+            app.Issue(app.client->RefreshFriends(), "Refresh");
+            app.friends.mine_loaded = false;
+            app.RefreshMyPresence();
+        }
+    }
     ImGui::SetNextItemWidth(220.0f);
     const bool enter = ImGui::InputTextWithHint("##add", "gamertag", app.friends.add_gamertag,
                                                 sizeof(app.friends.add_gamertag),
@@ -135,12 +148,6 @@ void DrawFriends(App& app) {
         const std::string tag = app.friends.add_gamertag;
         app.Issue(app.client->AddFriendByGamertag(tag), "Add " + tag);
         std::memset(app.friends.add_gamertag, 0, sizeof(app.friends.add_gamertag));
-    }
-    ImGui::SameLine();
-    if (ImGui::SmallButton("Refresh")) {
-        app.Issue(app.client->RefreshFriends(), "Refresh");
-        app.friends.mine_loaded = false;
-        app.RefreshMyPresence();
     }
 
     // -- what I can invite into ----------------------------------------------
