@@ -55,10 +55,10 @@ void DrawSupport(App& app) {
     ImGui::PopFont();
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(
-        "XenonLive is made by one person, in their spare time: the ports, this launcher, the "
-        "overlay, and the server that keeps your friends, invitations, messages and achievements. "
-        "Running that server costs money every month, and the rest costs evenings. If it has "
-        "given you something, here is how to give a little back.");
+        "XenonLive is a spare-time project by one developer, built with AI assistance: the ports, "
+        "this launcher, the overlay, and the server that keeps your friends, invitations, messages "
+        "and achievements. Running that server costs money every month, and the rest costs "
+        "evenings. If it has given you something, here is how to give a little back.");
     ImGui::PopTextWrapPos();
 
     xlive::theme::Section("Sponsor");
