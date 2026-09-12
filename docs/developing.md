@@ -279,8 +279,7 @@ screen (the acceptance run in `PLAN.md` uses them):
 | `XENONLIVE_SAY=<text>` | then sends that message |
 | `XENONLIVE_SCREENSHOT_MS=5000` | takes the screenshot later than two seconds |
 | `XENONLIVE_SIGNIN=register\|forgot` | opens that sign-in form |
-| `XENONLIVE_FORGOT=<gamertag>` | asks for a recovery code |
-| `XENONLIVE_RECOVER=<gamertag>:<code>:<password>` | sets a new password with a mailed code |
+| `XENONLIVE_FORGOT=<gamertag>` | has a new password mailed for that account |
 | `XENONLIVE_SET_EMAIL=<addr>` | saves that recovery email from the Account screen (`""` removes it) |
 | `XENONLIVE_CAPTURE=<n>` | selects the n-th capture on Issues |
 | `XENONLIVE_ISSUE_SEND="title\|what\|steps"` | fills the form on the selected capture and sends it |

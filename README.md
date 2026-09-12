@@ -121,9 +121,12 @@ report bugs on the port's GitHub page (links on the Support tab).
 ## Forgot your password?
 
 On the sign-in screen, *Forgot your password?* — enter your gamertag, and
-a code goes to the email on your account. Type the code and a new
-password; you are signed in and every other device is signed out. The
-code works for 30 minutes, once. An account without an email cannot be
+a **new password** is mailed to the email on your account. Sign in with
+it; that makes it your password and signs every other device out. Then
+change it to something of your own under Account. The mailed password
+works for a day. Until you use it your old one still works, so someone
+asking in your name costs you one email and nothing else (one mail per
+quarter hour per account). An account without an email cannot be
 recovered — see above.
 
 ## What is stored, and who sees what
@@ -173,6 +176,7 @@ release's checksums, swaps it in and restarts.
 | `taken` | that gamertag (or email) already has an account |
 | `bad_gamertag` / `bad_password` | the rules above |
 | `no_email` on Forgot | the account was created without an email; it cannot be recovered |
+| `too_soon` on Forgot | a password was mailed in the last quarter hour; check your inbox and spam |
 | `mail_unavailable` | the server you are on has no email set up (only on a self-hosted one) |
 | "offline: retrying in 4s" under the form | the server cannot be reached; the launcher keeps trying |
 | "could not check for releases" on Home | GitHub did not answer (offline, or its 60-requests-an-hour limit); it tries again in five minutes |
