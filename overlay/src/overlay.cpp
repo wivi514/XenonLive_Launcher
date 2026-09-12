@@ -649,8 +649,10 @@ void Overlay::Impl::DrainEvents(Client& c) {
                      " your invitation");
                 break;
             case xlive::EventKind::SigninChanged:
-                Push(c.identity().online() ? "Signed in as " + c.identity().gamertag
-                                           : "Signed out of XenonLive");
+                // Signing in is not news over a game the launcher just
+                // started as that account; the panel's header says who.
+                // Being signed OUT mid-game is.
+                if (!c.identity().online()) Push("Signed out of XenonLive");
                 break;
             case xlive::EventKind::ConnectionChanged:
                 if (!c.online()) Push("XenonLive connection lost; retrying");
@@ -853,7 +855,12 @@ void Overlay::Impl::DrawToasts(uint32_t width, uint32_t height) {
                 ImGui::TextUnformatted(t.name.c_str());
                 ImGui::PopFont();
                 if (t.score) {
+                    // The score is body-size beside a heading-size name:
+                    // dropped so the two sit on one baseline rather than
+                    // one top edge.
                     ImGui::SameLine();
+                    const float drop = fonts.heading->Ascent - ImGui::GetFont()->Ascent;
+                    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + drop);
                     ImGui::TextDisabled("%u G", t.score);
                 }
                 if (!t.description.empty()) {
