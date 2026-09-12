@@ -49,8 +49,9 @@ public:
     static Overlay& Instance();
 
     // The game's own client. Everything drawn is read from it — friends(),
-    // invites() — and every action is a call on it.
-    void SetClient(xlive::Client* client);
+    // invites() — and every action is a call on it. title_id is the running
+    // title's, for the achievements tab.
+    void SetClient(xlive::Client* client, uint32_t title_id);
     // The client's event callback forwards here. Thread-safe.
     void OnEvent(const xlive::Event& event);
 

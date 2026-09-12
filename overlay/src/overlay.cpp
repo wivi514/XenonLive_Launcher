@@ -6,6 +6,8 @@
 #include <atomic>
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <deque>
 #include <map>
 #include <mutex>
@@ -16,6 +18,12 @@
 
 #include "imgui.h"
 #include "imgui_impl_vulkan.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STBI_ONLY_PNG
+#define STBI_ONLY_JPEG
+#define STBI_NO_STDIO
+#include "stb_image.h"
 
 // The SDL2 backend's key map, which is the one table nobody should write
 // twice. Its NewFrame is not used — it calls into SDL from whatever thread
@@ -79,9 +87,20 @@ ImGuiKey PadButtonKey(uint8_t button) {
 
 }  // namespace
 
+// A tile uploaded to the GPU: its image, memory, view, and the descriptor
+// ImGui draws it with.
+struct Texture {
+    VkImage image = VK_NULL_HANDLE;
+    VkDeviceMemory memory = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+    VkDescriptorSet descriptor = VK_NULL_HANDLE;
+    int width = 0, height = 0;
+};
+
 struct Overlay::Impl {
     // -- shared ---------------------------------------------------------------
     std::atomic<Client*> client{nullptr};
+    std::atomic<uint32_t> title_id{0};
     std::atomic<bool> open{false};
     std::atomic<bool> wants_text{false};
     std::atomic<int> window_w{0}, window_h{0};
@@ -112,6 +131,23 @@ struct Overlay::Impl {
     bool was_open = false;
     std::vector<Client::Friend> last_friends;
     bool friends_baseline = false;
+
+    // The achievements tab: the title's definitions and this player's
+    // state, read once per opening (and again after an unlock), and the
+    // tiles, fetched once per run and kept on the GPU.
+    Client::Ticket title_ticket = 0;
+    Client::TitleResult title;
+    bool title_loaded = false;
+    std::string title_error;
+    bool title_stale = true;
+    std::map<uint32_t, Client::Ticket> image_tickets;  // image id -> ticket
+    std::map<uint32_t, Texture> tiles;                 // image id -> texture
+    std::map<uint32_t, bool> tiles_missing;            // image id -> asked, none
+    VkCommandPool upload_pool = VK_NULL_HANDLE;
+    VkSampler sampler = VK_NULL_HANDLE;
+    bool UploadTile(uint32_t image_id, const std::string& bytes);
+    void DestroyTextures();
+    void DrawAchievements(Client& c, float width);
 
     // Our own clock for the toasts, not ImGui's: a toast can arrive on a
     // frame where ImGui is never touched.
@@ -144,7 +180,10 @@ Overlay& Overlay::Instance() {
 Overlay::Overlay() : impl_(new Impl) {}
 Overlay::~Overlay() { delete impl_; }
 
-void Overlay::SetClient(xlive::Client* client) { impl_->client.store(client); }
+void Overlay::SetClient(xlive::Client* client, uint32_t title_id) {
+    impl_->client.store(client);
+    impl_->title_id.store(title_id);
+}
 
 void Overlay::OnEvent(const xlive::Event& event) {
     std::lock_guard<std::mutex> lock(impl_->events_mutex);
@@ -252,7 +291,11 @@ void Overlay::Impl::Init(const VulkanHandles& h) {
     info.Device = h.device;
     info.QueueFamily = h.queue_family;
     info.Queue = h.queue;
-    info.DescriptorPoolSize = 8;
+    // One descriptor per texture: the font atlas and every achievement tile
+    // (a title has a dozen; a second title's tiles never load in the same
+    // process). Too small a pool fails the allocation and the driver then
+    // faults on the null set — the first version had 8.
+    info.DescriptorPoolSize = 128;
     info.MinImageCount = std::max(2u, h.image_count);
     info.ImageCount = std::max(2u, h.image_count);
     info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
@@ -294,9 +337,170 @@ void Overlay::Shutdown() {
     if (!s.initialized) return;
     vkDeviceWaitIdle(s.handles.device);
     s.DropViews();
+    s.DestroyTextures();
     ImGui_ImplVulkan_Shutdown();
     ImGui::DestroyContext();
     s.initialized = false;
+}
+
+// -- tiles on the GPU -------------------------------------------------------------
+//
+// A synchronous upload on the render thread: a staging buffer, a one-shot
+// command buffer, a submit and a wait. The port's own texture uploads do
+// the same, and so does ImGui's font atlas; a dozen 64x64 tiles when the
+// tab first opens is not a stall anyone can see.
+
+namespace {
+
+uint32_t FindMemoryType(VkPhysicalDevice physical, uint32_t type_bits, VkMemoryPropertyFlags wanted) {
+    VkPhysicalDeviceMemoryProperties props;
+    vkGetPhysicalDeviceMemoryProperties(physical, &props);
+    for (uint32_t i = 0; i < props.memoryTypeCount; ++i) {
+        if ((type_bits & (1u << i)) && (props.memoryTypes[i].propertyFlags & wanted) == wanted) return i;
+    }
+    return UINT32_MAX;
+}
+
+}  // namespace
+
+bool Overlay::Impl::UploadTile(uint32_t image_id, const std::string& bytes) {
+    int w = 0, h = 0, channels = 0;
+    stbi_uc* pixels = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(bytes.data()),
+                                            int(bytes.size()), &w, &h, &channels, 4);
+    if (!pixels) return false;
+    const VkDevice device = handles.device;
+    const VkDeviceSize size = VkDeviceSize(w) * VkDeviceSize(h) * 4;
+    Texture t;
+    t.width = w;
+    t.height = h;
+    bool ok = false;
+    VkBuffer staging = VK_NULL_HANDLE;
+    VkDeviceMemory staging_memory = VK_NULL_HANDLE;
+    VkCommandBuffer cmd = VK_NULL_HANDLE;
+    VkFence fence = VK_NULL_HANDLE;
+    do {
+        if (upload_pool == VK_NULL_HANDLE) {
+            VkCommandPoolCreateInfo pi{VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO};
+            pi.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+            pi.queueFamilyIndex = handles.queue_family;
+            if (vkCreateCommandPool(device, &pi, nullptr, &upload_pool) != VK_SUCCESS) break;
+        }
+        if (sampler == VK_NULL_HANDLE) {
+            VkSamplerCreateInfo si{VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO};
+            si.magFilter = si.minFilter = VK_FILTER_LINEAR;
+            si.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+            si.addressModeU = si.addressModeV = si.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+            si.maxLod = 1.0f;
+            if (vkCreateSampler(device, &si, nullptr, &sampler) != VK_SUCCESS) break;
+        }
+        // The image.
+        VkImageCreateInfo ii{VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO};
+        ii.imageType = VK_IMAGE_TYPE_2D;
+        ii.format = VK_FORMAT_R8G8B8A8_UNORM;
+        ii.extent = {uint32_t(w), uint32_t(h), 1};
+        ii.mipLevels = 1;
+        ii.arrayLayers = 1;
+        ii.samples = VK_SAMPLE_COUNT_1_BIT;
+        ii.tiling = VK_IMAGE_TILING_OPTIMAL;
+        ii.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        ii.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        if (vkCreateImage(device, &ii, nullptr, &t.image) != VK_SUCCESS) break;
+        VkMemoryRequirements req;
+        vkGetImageMemoryRequirements(device, t.image, &req);
+        VkMemoryAllocateInfo ai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        ai.allocationSize = req.size;
+        ai.memoryTypeIndex = FindMemoryType(handles.physical, req.memoryTypeBits, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+        if (ai.memoryTypeIndex == UINT32_MAX || vkAllocateMemory(device, &ai, nullptr, &t.memory) != VK_SUCCESS) break;
+        if (vkBindImageMemory(device, t.image, t.memory, 0) != VK_SUCCESS) break;
+        VkImageViewCreateInfo vi{VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO};
+        vi.image = t.image;
+        vi.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        vi.format = VK_FORMAT_R8G8B8A8_UNORM;
+        vi.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        if (vkCreateImageView(device, &vi, nullptr, &t.view) != VK_SUCCESS) break;
+        // The staging buffer, filled from the CPU.
+        VkBufferCreateInfo bi{VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO};
+        bi.size = size;
+        bi.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        if (vkCreateBuffer(device, &bi, nullptr, &staging) != VK_SUCCESS) break;
+        VkMemoryRequirements breq;
+        vkGetBufferMemoryRequirements(device, staging, &breq);
+        VkMemoryAllocateInfo bai{VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO};
+        bai.allocationSize = breq.size;
+        bai.memoryTypeIndex = FindMemoryType(handles.physical, breq.memoryTypeBits,
+                                             VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+        if (bai.memoryTypeIndex == UINT32_MAX || vkAllocateMemory(device, &bai, nullptr, &staging_memory) != VK_SUCCESS) break;
+        if (vkBindBufferMemory(device, staging, staging_memory, 0) != VK_SUCCESS) break;
+        void* mapped = nullptr;
+        if (vkMapMemory(device, staging_memory, 0, size, 0, &mapped) != VK_SUCCESS) break;
+        std::memcpy(mapped, pixels, size_t(size));
+        vkUnmapMemory(device, staging_memory);
+        // One command buffer: undefined -> transfer dst, copy, -> shader read.
+        VkCommandBufferAllocateInfo cai{VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO};
+        cai.commandPool = upload_pool;
+        cai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+        cai.commandBufferCount = 1;
+        if (vkAllocateCommandBuffers(device, &cai, &cmd) != VK_SUCCESS) break;
+        VkCommandBufferBeginInfo begin{VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
+        begin.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        vkBeginCommandBuffer(cmd, &begin);
+        VkImageMemoryBarrier to_dst{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+        to_dst.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        to_dst.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        to_dst.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        to_dst.srcQueueFamilyIndex = to_dst.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+        to_dst.image = t.image;
+        to_dst.subresourceRange = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_HOST_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0, nullptr, 1, &to_dst);
+        VkBufferImageCopy region{};
+        region.imageSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1};
+        region.imageExtent = {uint32_t(w), uint32_t(h), 1};
+        vkCmdCopyBufferToImage(cmd, staging, t.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        VkImageMemoryBarrier to_read = to_dst;
+        to_read.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        to_read.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        to_read.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+        to_read.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        vkCmdPipelineBarrier(cmd, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr, 0, nullptr, 1, &to_read);
+        vkEndCommandBuffer(cmd);
+        VkFenceCreateInfo fi{VK_STRUCTURE_TYPE_FENCE_CREATE_INFO};
+        if (vkCreateFence(device, &fi, nullptr, &fence) != VK_SUCCESS) break;
+        VkSubmitInfo submit{VK_STRUCTURE_TYPE_SUBMIT_INFO};
+        submit.commandBufferCount = 1;
+        submit.pCommandBuffers = &cmd;
+        if (vkQueueSubmit(handles.queue, 1, &submit, fence) != VK_SUCCESS) break;
+        vkWaitForFences(device, 1, &fence, VK_TRUE, UINT64_MAX);
+        t.descriptor = ImGui_ImplVulkan_AddTexture(sampler, t.view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        ok = t.descriptor != VK_NULL_HANDLE;
+    } while (false);
+    stbi_image_free(pixels);
+    if (fence) vkDestroyFence(device, fence, nullptr);
+    if (cmd) vkFreeCommandBuffers(device, upload_pool, 1, &cmd);
+    if (staging) vkDestroyBuffer(device, staging, nullptr);
+    if (staging_memory) vkFreeMemory(device, staging_memory, nullptr);
+    if (!ok) {
+        if (t.view) vkDestroyImageView(device, t.view, nullptr);
+        if (t.image) vkDestroyImage(device, t.image, nullptr);
+        if (t.memory) vkFreeMemory(device, t.memory, nullptr);
+        return false;
+    }
+    tiles[image_id] = t;
+    return true;
+}
+
+void Overlay::Impl::DestroyTextures() {
+    const VkDevice device = handles.device;
+    for (auto& [id, t] : tiles) {
+        if (t.descriptor) ImGui_ImplVulkan_RemoveTexture(t.descriptor);
+        if (t.view) vkDestroyImageView(device, t.view, nullptr);
+        if (t.image) vkDestroyImage(device, t.image, nullptr);
+        if (t.memory) vkFreeMemory(device, t.memory, nullptr);
+    }
+    tiles.clear();
+    if (sampler) vkDestroySampler(device, sampler, nullptr);
+    sampler = VK_NULL_HANDLE;
+    if (upload_pool) vkDestroyCommandPool(device, upload_pool, nullptr);
+    upload_pool = VK_NULL_HANDLE;
 }
 
 // -- input and events ------------------------------------------------------
@@ -384,6 +588,7 @@ void Overlay::Impl::DrainEvents(Client& c) {
     for (const xlive::Event& event : batch) {
         switch (event.kind) {
             case xlive::EventKind::AchievementUnlocked:
+                title_stale = true;
                 Push("Achievement unlocked: " +
                          (event.achievement_name.empty() ? "#" + std::to_string(event.achievement_id)
                                                          : event.achievement_name) +
@@ -457,6 +662,45 @@ void Overlay::Impl::PollTickets(Client& c) {
     if (refresh_ticket) {
         Client::SocialResult result;
         if (c.Poll(refresh_ticket, result) != Client::OpStatus::Pending) refresh_ticket = 0;
+    }
+    if (title_ticket) {
+        Client::TitleResult result;
+        const auto status = c.Poll(title_ticket, result);
+        if (status != Client::OpStatus::Pending) {
+            title_ticket = 0;
+            if (status == Client::OpStatus::Succeeded) {
+                title = std::move(result);
+                title_loaded = true;
+                title_error.clear();
+                // The tiles, once per run: the server holds them for the
+                // ids the definitions name, and they never change.
+                for (const auto& a : title.title.achievements) {
+                    if (a.image_id == 0 || tiles.count(a.image_id) || tiles_missing.count(a.image_id) ||
+                        image_tickets.count(a.image_id)) {
+                        continue;
+                    }
+                    if (!title.title.images.empty() && !title.title.HasImage(a.image_id)) {
+                        tiles_missing[a.image_id] = true;
+                        continue;
+                    }
+                    image_tickets[a.image_id] = c.LoadImage(title.title.title_id, a.image_id);
+                }
+            } else {
+                title_error = result.error.empty() ? "unknown" : result.error;
+            }
+        }
+    }
+    for (auto it = image_tickets.begin(); it != image_tickets.end();) {
+        Client::ImageResult result;
+        const auto status = c.Poll(it->second, result);
+        if (status == Client::OpStatus::Pending) {
+            ++it;
+            continue;
+        }
+        if (status != Client::OpStatus::Succeeded || !UploadTile(it->first, result.bytes)) {
+            tiles_missing[it->first] = true;
+        }
+        it = image_tickets.erase(it);
     }
 }
 
@@ -603,9 +847,103 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
+        // XLIVE_OVERLAY_TAB=achievements|invites selects a tab on the first
+        // frame, for a headless photograph; nobody at a keyboard needs it.
+        static const char* wanted_tab = std::getenv("XLIVE_OVERLAY_TAB");
+        static bool tab_selected = false;
+        const auto select = [&](const char* name) {
+            const bool pick = wanted_tab && !tab_selected && std::strcmp(wanted_tab, name) == 0;
+            return pick ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+        };
+        if (ImGui::BeginTabItem("Achievements", nullptr, select("achievements"))) {
+            DrawAchievements(c, size.x);
+            ImGui::EndTabItem();
+        }
+        tab_selected = true;
         ImGui::EndTabBar();
     }
     ImGui::End();
+}
+
+void Overlay::Impl::DrawAchievements(Client& c, float width) {
+    const uint32_t id = title_id.load();
+    if (id == 0) {
+        ImGui::TextDisabled("No title.");
+        return;
+    }
+    // Read once per opening, and again after an unlock; never per frame.
+    if (title_stale && !title_ticket) {
+        title_ticket = c.LoadTitle(id);
+        title_stale = false;
+    }
+    ImGui::SameLine(width - 110.0f * scale);
+    ImGui::BeginDisabled(title_ticket != 0);
+    if (ImGui::SmallButton("Refresh")) title_stale = true;
+    ImGui::EndDisabled();
+
+    if (!title_loaded) {
+        if (title_ticket) {
+            ImGui::TextDisabled("loading...");
+        } else if (!title_error.empty()) {
+            ImGui::TextDisabled("%s", title_error.c_str());
+            if (title_error == "no_title") ImGui::TextDisabled("This server has not imported the title.");
+        }
+        return;
+    }
+    const Client::TitleInfo& info = title.title;
+
+    // The server's word, plus what this client unlocked since and has not
+    // yet delivered: an achievement earned a second ago is unlocked here
+    // whether or not the queue has drained.
+    unsigned unlocked_count = 0;
+    for (const auto& a : info.achievements) unlocked_count += a.unlocked || c.IsUnlocked(a.id);
+    ImGui::Text("%u of %zu unlocked", unlocked_count, info.achievements.size());
+    ImGui::SameLine();
+    ImGui::TextDisabled("%u / %u G", c.title_gamerscore(), info.max_gamerscore);
+    ImGui::Separator();
+
+    ImGui::BeginChild("achievements", ImVec2(0, 0), ImGuiChildFlags_None);
+    const float tile = 56.0f * scale;
+    for (const auto& a : info.achievements) {
+        const bool unlocked = a.unlocked || c.IsUnlocked(a.id);
+        const bool secret = a.hidden && !unlocked;
+        ImGui::PushID(a.id);
+        ImGui::BeginChild("row", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        auto found = tiles.find(a.image_id);
+        if (!secret && found != tiles.end()) {
+            const ImVec4 tint = unlocked ? ImVec4(1, 1, 1, 1) : ImVec4(0.5f, 0.5f, 0.5f, 0.75f);
+            ImGui::ImageWithBg(reinterpret_cast<ImTextureID>(found->second.descriptor), ImVec2(tile, tile),
+                               ImVec2(0, 0), ImVec2(1, 1), ImVec4(0, 0, 0, 0), tint);
+        } else {
+            ImGui::Dummy(ImVec2(tile, tile));
+            ImGui::GetWindowDrawList()->AddRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax(),
+                                                ImGui::GetColorU32(ImGuiCol_Border));
+        }
+        ImGui::SameLine();
+        ImGui::BeginGroup();
+        if (unlocked) {
+            ImGui::TextColored(kGreen, "%s", a.name.c_str());
+        } else {
+            ImGui::TextDisabled("%s", secret ? "Secret achievement" : a.name.c_str());
+        }
+        ImGui::SameLine();
+        ImGui::TextDisabled("%u G", a.score);
+        ImGui::PushTextWrapPos(width - tile - 60.0f * scale);
+        if (unlocked) {
+            ImGui::TextUnformatted(a.unlocked_description.empty() ? a.locked_description.c_str()
+                                                                  : a.unlocked_description.c_str());
+            if (!a.unlocked_at.empty()) ImGui::TextDisabled("unlocked %s", a.unlocked_at.c_str());
+        } else if (secret) {
+            ImGui::TextDisabled("Keep playing to reveal it.");
+        } else {
+            ImGui::TextUnformatted(a.locked_description.c_str());
+        }
+        ImGui::PopTextWrapPos();
+        ImGui::EndGroup();
+        ImGui::EndChild();
+        ImGui::PopID();
+    }
+    ImGui::EndChild();
 }
 
 // -- the frame ------------------------------------------------------------------
@@ -664,6 +1002,7 @@ bool Overlay::Render(const VulkanHandles& handles, VkCommandBuffer cmd, VkImage 
         // Opening: read what the panel needs once, not per frame.
         s.presence_ticket = client->LoadMyPresence();
         s.refresh_ticket = client->RefreshInvites();
+        s.title_stale = true;
         io.ClearInputKeys();
         io.ClearInputMouse();
     }

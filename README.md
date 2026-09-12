@@ -86,7 +86,9 @@ counts on a player having a launcher and a game connected at once.
 `overlay/` is a second product of this repo: a static library a port links
 to get a Steam-style overlay inside the game — **Shift+Tab** (or **Back+Start**
 on a pad) opens a panel over the running title with the friends list
-(presence, *Invite*), the invitation inbox (*Accept* / *Decline*) and
+(presence, *Invite*), the invitation inbox (*Accept* / *Decline*), the
+title's achievements (tile, name, description, score, unlock date; what you
+have and what you have not, secret ones hidden until earned) and
 notifications that show even while it is closed: an invitation arriving,
 a friend coming online, an achievement unlocking.
 
