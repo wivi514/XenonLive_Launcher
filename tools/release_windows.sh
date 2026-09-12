@@ -50,7 +50,7 @@ RUN=(podman run --rm -i
      -w "$ROOT" "$IMAGE" bash -s)
 "${RUN[@]}" <<INNER
 set -euo pipefail
-MW="$MW"; ROOT="$ROOT"; OUT="$OUT"; NAME="$NAME"; XLIVE_ROOT="$XLIVE_ROOT"
+MW="$MW"; ROOT="$ROOT"; OUT="$OUT"; NAME="$NAME"; XLIVE_ROOT="$XLIVE_ROOT"; VERSION="$VERSION"
 TC="\$ROOT/tools/release/mingw/toolchain.cmake"
 
 if [ -z "\${XL_MINGW_SKIP_DEPS:-}" ] || [ ! -f "\$MW/sdl2/bin/SDL2.dll" ]; then
