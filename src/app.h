@@ -92,8 +92,8 @@ public:
 
     struct SignInState {
         // Which form the panel shows. Register asks for the optional email;
-        // Forgot asks for the gamertag, then the mailed code and a new
-        // password.
+        // Forgot asks for the gamertag and has a new password mailed, which
+        // the player then signs in with on the ordinary form.
         enum class Mode { SignIn, Register, Forgot };
         Mode mode = Mode::SignIn;
         char server[256] = {};
@@ -102,15 +102,14 @@ public:
         // Register only. For password recovery and nothing else; empty
         // means the account cannot be recovered, and the form says so.
         char email[256] = {};
-        // Forgot only: the eight letters from the mail.
-        char code[32] = {};
         xlive::Client::Ticket ticket = 0;
         // What the ticket is doing, for the status line.
-        enum class Pending { SignIn, Register, Forgot, Reset };
+        enum class Pending { SignIn, Register, Forgot };
         Pending pending = Pending::SignIn;
         std::string error;
-        // Forgot: where the code went, masked ("f***@example.org"), once
-        // the server has sent it. Non-empty switches the form to the code.
+        // Forgot: where the new password went, masked ("f***@example.org"),
+        // once the server has sent it. Non-empty shows the "check your mail,
+        // then sign in with it" note on the sign-in form.
         std::string sent_to;
     } signin;
 

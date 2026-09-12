@@ -102,7 +102,6 @@ void DrawSignIn(App& app) {
         st.mode = mode;
         st.error.clear();
         st.sent_to.clear();
-        std::memset(st.code, 0, sizeof(st.code));
     };
     const auto start = [&](Pending what, xlive::Client::Ticket ticket) {
         st.pending = what;
@@ -119,6 +118,15 @@ void DrawSignIn(App& app) {
     ImGui::BeginDisabled(busy);
     switch (st.mode) {
     case Mode::SignIn: {
+        if (!st.sent_to.empty()) {
+            ImGui::TextColored(xlive::theme::kLime, "A new password was sent to %s.", st.sent_to.c_str());
+            ImGui::PushStyleColor(ImGuiCol_Text, xlive::theme::kMuted);
+            ImGui::TextWrapped("Sign in with it here (check spam if it is not there). It works for "
+                               "24 hours; your old password still works until you use the new one. "
+                               "Once in, change it under Account.");
+            ImGui::PopStyleColor();
+            ImGui::Spacing();
+        }
         ImGui::TextUnformatted("Gamertag");
         ImGui::SetNextItemWidth(-1.0f);
         ImGui::InputText("##gamertag", st.gamertag, sizeof(st.gamertag));
@@ -170,42 +178,20 @@ void DrawSignIn(App& app) {
         break;
     }
     case Mode::Forgot: {
-        if (st.sent_to.empty()) {
-            ImGui::TextUnformatted("Gamertag");
-            ImGui::SetNextItemWidth(-1.0f);
-            const bool enter = ImGui::InputText("##gamertag", st.gamertag, sizeof(st.gamertag),
-                                                ImGuiInputTextFlags_EnterReturnsTrue);
-            ImGui::PushStyleColor(ImGuiCol_Text, xlive::theme::kMuted);
-            ImGui::TextWrapped("A code goes to the email you gave when you created the account. "
-                               "An account created without one cannot be recovered.");
-            ImGui::PopStyleColor();
-            ImGui::Spacing();
-            if ((ImGui::Button("Send me a code", ImVec2(-1.0f, 0.0f)) || enter) && app.client) {
-                use_server();
-                start(Pending::Forgot, app.client->ForgotPassword(st.gamertag));
-            }
-        } else {
-            ImGui::TextWrapped("A code was sent to %s. It works for 30 minutes.", st.sent_to.c_str());
-            ImGui::Spacing();
-            ImGui::TextUnformatted("Code from the email");
-            ImGui::SetNextItemWidth(-1.0f);
-            ImGui::InputText("##code", st.code, sizeof(st.code),
-                             ImGuiInputTextFlags_CharsUppercase | ImGuiInputTextFlags_CharsNoBlank);
-            ImGui::TextUnformatted("New password");
-            ImGui::SetNextItemWidth(-1.0f);
-            const bool enter = ImGui::InputText("##password", st.password, sizeof(st.password),
-                                                ImGuiInputTextFlags_Password |
-                                                    ImGuiInputTextFlags_EnterReturnsTrue);
-            ImGui::Spacing();
-            if ((ImGui::Button("Set new password", ImVec2(half, 0.0f)) || enter) && app.client) {
-                start(Pending::Reset,
-                      app.client->ResetPassword(st.gamertag, st.code, st.password));
-            }
-            ImGui::SameLine();
-            if (xlive::theme::SecondaryButton("Send another code", ImVec2(-1.0f, 0.0f)) && app.client) {
-                std::memset(st.code, 0, sizeof(st.code));
-                start(Pending::Forgot, app.client->ForgotPassword(st.gamertag));
-            }
+        ImGui::TextUnformatted("Gamertag");
+        ImGui::SetNextItemWidth(-1.0f);
+        const bool enter = ImGui::InputText("##gamertag", st.gamertag, sizeof(st.gamertag),
+                                            ImGuiInputTextFlags_EnterReturnsTrue);
+        ImGui::PushStyleColor(ImGuiCol_Text, xlive::theme::kMuted);
+        ImGui::TextWrapped("A new password goes to the email you gave when you created the "
+                           "account. Your current password keeps working until you sign in "
+                           "with the new one; change it afterwards under Account. An account "
+                           "created without an email cannot be recovered.");
+        ImGui::PopStyleColor();
+        ImGui::Spacing();
+        if ((ImGui::Button("Email me a new password", ImVec2(-1.0f, 0.0f)) || enter) && app.client) {
+            use_server();
+            start(Pending::Forgot, app.client->ForgotPassword(st.gamertag));
         }
         ImGui::Spacing();
         if (ImGui::TextLink("Back to sign in")) switch_to(Mode::SignIn);
@@ -244,8 +230,7 @@ void DrawSignIn(App& app) {
         switch (st.pending) {
         case Pending::SignIn: break;
         case Pending::Register: doing = "Creating the account..."; break;
-        case Pending::Forgot: doing = "Sending the code..."; break;
-        case Pending::Reset: doing = "Setting the password..."; break;
+        case Pending::Forgot: doing = "Sending the mail..."; break;
         }
         ImGui::TextDisabled("%s", doing);
     } else if (!st.error.empty()) {
@@ -267,15 +252,15 @@ void DrawSignIn(App& app) {
         } else if (e == "no_account") {
             help = "No account has that gamertag.";
         } else if (e == "no_email") {
-            help = "This account was created without an email, so there is no way to "
-                   "send it a code. It cannot be recovered.";
+            help = "This account was created without an email, so there is nowhere to "
+                   "send a new password. It cannot be recovered.";
         } else if (e == "mail_unavailable") {
             help = "This server cannot send email, so it cannot recover accounts.";
         } else if (e == "mail_failed") {
             help = "The server could not send the mail just now. Try again in a minute.";
-        } else if (e == "bad_code") {
-            help = "That code is wrong, expired or already used. Check the newest mail, or "
-                   "send another code.";
+        } else if (e == "too_soon") {
+            help = "A new password was mailed a moment ago. Check the inbox (and spam); "
+                   "another can be sent in 15 minutes.";
         } else if (e == "rate_limited") {
             help = "Too many tries from this address. Wait a while.";
         } else if (e == "no_server") {

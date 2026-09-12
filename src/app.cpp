@@ -473,17 +473,19 @@ void App::PollPending() {
             if (status != xlive::Client::OpStatus::Succeeded) {
                 signin.error = result.error.empty() ? "unknown" : result.error;
             } else if (signin.pending == SignInState::Pending::Forgot) {
-                // The mail is out; the form now wants the code.
+                // The mail is out. Back to the sign-in form, which says
+                // where the password went; the player signs in with it.
                 signin.error.clear();
+                signin.mode = SignInState::Mode::SignIn;
                 signin.sent_to = result.detail.empty() ? "your email" : result.detail;
+                std::memset(signin.password, 0, sizeof(signin.password));
             } else {
-                // Signed in, registered, or reset (which signs in too).
+                // Signed in or registered.
                 signin.error.clear();
                 signin.mode = SignInState::Mode::SignIn;
                 signin.sent_to.clear();
                 std::memset(signin.password, 0, sizeof(signin.password));
                 std::memset(signin.email, 0, sizeof(signin.email));
-                std::memset(signin.code, 0, sizeof(signin.code));
                 adding_account = false;
             }
         }

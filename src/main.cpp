@@ -33,8 +33,7 @@ namespace {
 // Compare on the first title; XENONLIVE_MESSAGE=<gamertag> opens the
 // conversation with that friend, and XENONLIVE_SAY=<text> then sends that.
 // XENONLIVE_SIGNIN=register|forgot opens that form; XENONLIVE_FORGOT=<gamertag>
-// asks for a recovery code; XENONLIVE_RECOVER=<gamertag>:<code>:<password>
-// sets a new password with a code already mailed. XENONLIVE_CAPTURE=<n>
+// has a new password mailed for that account. XENONLIVE_CAPTURE=<n>
 // selects the n-th capture on the Issues tab; XENONLIVE_ISSUE_SEND="title|what
 // happened|steps" fills the form and sends it; XENONLIVE_ISSUE_SEARCH=<words>
 // searches the reports and selects the first hit. XENONLIVE_SET_EMAIL=<addr>
@@ -160,7 +159,6 @@ int main(int, char**) {
             }
         }
     }
-    const char* recover = std::getenv("XENONLIVE_RECOVER");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -201,26 +199,6 @@ int main(int, char**) {
             app.signin.pending = launcher::App::SignInState::Pending::Forgot;
             app.signin.ticket = app.client->ForgotPassword(forgot_tag);
             forgot_tag = nullptr;
-        }
-        if (recover && app.client) {
-            const std::string spec(recover);
-            const auto a = spec.find(':');
-            const auto b = a == std::string::npos ? a : spec.find(':', a + 1);
-            if (b != std::string::npos) {
-                app.signin.mode = launcher::App::SignInState::Mode::Forgot;
-                app.signin.sent_to = "your email";
-                std::snprintf(app.signin.gamertag, sizeof(app.signin.gamertag), "%s",
-                              spec.substr(0, a).c_str());
-                std::snprintf(app.signin.code, sizeof(app.signin.code), "%s",
-                              spec.substr(a + 1, b - a - 1).c_str());
-                app.signin.pending = launcher::App::SignInState::Pending::Reset;
-                app.signin.ticket = app.client->ResetPassword(spec.substr(0, a),
-                                                              spec.substr(a + 1, b - a - 1),
-                                                              spec.substr(b + 1));
-            } else {
-                std::fprintf(stderr, "[launcher] XENONLIVE_RECOVER wants gamertag:code:password\n");
-            }
-            recover = nullptr;
         }
         if (set_email && app.signed_in() && app.client->online()) {
             app.OpenAccount();
