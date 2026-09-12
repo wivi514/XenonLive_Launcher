@@ -191,6 +191,8 @@ void DrawProfile(App& app) {
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
+            if (ImGui::SmallButton("Message")) app.OpenConversation(entry.xuid, entry.gamertag);
+            ImGui::SameLine();
             if (ImGui::SmallButton("Remove friend")) {
                 app.Issue(app.client->RemoveFriend(entry.xuid), "Remove " + entry.gamertag);
             }

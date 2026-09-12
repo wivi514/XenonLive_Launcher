@@ -307,6 +307,57 @@ void App::PollPending() {
     poll_half(profile.theirs_ticket, profile.theirs, profile.mine_ticket);
     poll_half(profile.mine_ticket, profile.mine, profile.theirs_ticket);
 
+    if (messages.inbox_ticket != 0) {
+        xlive::Client::SocialResult result;
+        const auto status = client->Poll(messages.inbox_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            messages.inbox_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                messages.inbox = std::move(result.messages);
+                messages.inbox_loaded = true;
+            }
+        }
+    }
+    if (messages.conversation_ticket != 0) {
+        xlive::Client::SocialResult result;
+        const auto status = client->Poll(messages.conversation_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            messages.conversation_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                messages.conversation = std::move(result.messages);
+                messages.conversation_loaded = true;
+                messages.scroll_to_end = true;
+                messages.error.clear();
+            } else {
+                messages.error = result.error.empty() ? "unknown" : result.error;
+            }
+        }
+    }
+    if (messages.send_ticket != 0) {
+        xlive::Client::SocialResult result;
+        const auto status = client->Poll(messages.send_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            messages.send_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                std::memset(messages.draft, 0, sizeof(messages.draft));
+                messages.focus_draft = true;
+                if (!result.messages.empty()) {
+                    messages.conversation.push_back(result.messages.front());
+                    while (messages.conversation.size() > xlive::Client::kMessagesKept) {
+                        messages.conversation.erase(messages.conversation.begin());
+                    }
+                    messages.scroll_to_end = true;
+                }
+                RefreshInbox();
+            } else {
+                const std::string why = result.error == "too_long" ? "it is over 256 characters"
+                                        : result.error == "not_friends" ? "you are not friends"
+                                        : result.error;
+                toasts.Push("Message not sent: " + why, 6.0);
+            }
+        }
+    }
+
     if (signin.ticket != 0) {
         xlive::Client::SocialResult result;
         const auto status = client->Poll(signin.ticket, result);
@@ -360,6 +411,47 @@ void App::LoadCompare(uint32_t title_id) {
     profile.mine = xlive::Client::TitleInfo{};
     profile.theirs_ticket = client->LoadPlayerTitle(profile.xuid, title_id);
     profile.mine_ticket = client->LoadTitle(title_id);
+}
+
+// -- messages -------------------------------------------------------------------
+
+void App::RefreshInbox() {
+    if (!client || !signed_in() || messages.inbox_ticket != 0) return;
+    messages.inbox_ticket = client->LoadConversations();
+}
+
+void App::OpenConversation(uint64_t xuid, const std::string& gamertag) {
+    if (!client || xuid == 0) return;
+    if (messages.conversation_ticket != 0) client->Forget(messages.conversation_ticket);
+    if (messages.peer != xuid) {
+        std::memset(messages.draft, 0, sizeof(messages.draft));
+        messages.conversation.clear();
+        messages.conversation_loaded = false;
+    }
+    messages.peer = xuid;
+    messages.peer_gamertag = gamertag;
+    messages.error.clear();
+    messages.unread.erase(xuid);
+    messages.conversation_ticket = client->LoadConversation(xuid);
+    messages.focus_draft = true;
+    tab = Tab::Messages;
+}
+
+void App::SendDraft() {
+    if (!client || messages.peer == 0 || messages.send_ticket != 0) return;
+    // Trim trailing whitespace and newlines; an empty draft is not a send.
+    std::string body = messages.draft;
+    while (!body.empty() && (body.back() == ' ' || body.back() == '\n' || body.back() == '\r')) {
+        body.pop_back();
+    }
+    if (body.empty()) return;
+    messages.send_ticket = client->SendMessage(messages.peer, body);
+}
+
+int App::unread_messages() const {
+    int n = 0;
+    for (const auto& [xuid, count] : messages.unread) n += count;
+    return n;
 }
 
 // -- invites ------------------------------------------------------------------
@@ -603,6 +695,7 @@ void App::HandleEvent(const xlive::Event& event) {
                 achievements.loaded = false;
                 if (tab == Tab::Profile) tab = Tab::Friends;
                 profile = ProfileState{};
+                messages = MessagesState{};
             }
             break;
 
@@ -663,6 +756,24 @@ void App::HandleEvent(const xlive::Event& event) {
             toasts.Push(event.gamertag + (event.accepted ? " accepted" : " declined") +
                         " your invitation");
             break;
+
+        case EventKind::MessageReceived: {
+            const uint64_t from = event.xuid;
+            const std::string who = event.gamertag;
+            if (tab == Tab::Messages && messages.peer == from) {
+                // The open conversation: re-read it so the new one has its
+                // id and time, and the window stays at 20.
+                if (messages.conversation_ticket == 0) {
+                    messages.conversation_ticket = client->LoadConversation(from);
+                }
+            } else {
+                messages.unread[from] += 1;
+            }
+            RefreshInbox();
+            toasts.PushWithAction(who + ": " + event.message, "Reply",
+                                  [this, from, who] { OpenConversation(from, who); }, 8.0);
+            break;
+        }
 
         case EventKind::AchievementUnlocked:
             // Only a title client sees this; kept for the day the library
@@ -763,6 +874,9 @@ void App::DrawRail() {
     };
     blade("Home", Tab::Home);
     blade("Friends", Tab::Friends);
+    char unread[16] = {};
+    if (unread_messages() > 0) std::snprintf(unread, sizeof(unread), "%d", unread_messages());
+    blade("Messages", Tab::Messages, unread);
     const size_t inbox = client ? client->invites().size() : 0;
     char badge[16] = {};
     if (inbox > 0) std::snprintf(badge, sizeof(badge), "%zu", inbox);
@@ -790,6 +904,7 @@ void App::DrawContent() {
     switch (tab) {
         case Tab::Home:         DrawHome(*this); break;
         case Tab::Friends:      DrawFriends(*this); break;
+        case Tab::Messages:     DrawMessages(*this); break;
         case Tab::Invites:      DrawInvites(*this); break;
         case Tab::Achievements: DrawAchievements(*this); break;
         case Tab::Profile:      DrawProfile(*this); break;

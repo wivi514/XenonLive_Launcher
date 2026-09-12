@@ -22,14 +22,16 @@ namespace {
 
 // Two development hooks, for driving the launcher from a shell with no one
 // at the screen: XENONLIVE_SCREENSHOT=file.bmp saves the window after two
-// seconds and keeps going; XENONLIVE_TAB=home|friends|invites|achievements
+// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements
 // picks the starting tab; XENONLIVE_PLAY=1 presses Play on the first title
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
 // in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
 // XENONLIVE_SCREENSHOT_MS moves the screenshot later than two seconds;
 // XENONLIVE_SWITCH=<xuid hex> presses Use on that saved account;
 // XENONLIVE_PROFILE=<gamertag> opens that friend's profile page and presses
-// Compare on the first title. None does anything unless set.
+// Compare on the first title; XENONLIVE_MESSAGE=<gamertag> opens the
+// conversation with that friend, and XENONLIVE_SAY=<text> then sends that.
+// None does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
     SDL_GetRendererOutputSize(renderer, &w, &h);
@@ -50,6 +52,7 @@ launcher::Tab StartingTab() {
     if (!tab) return launcher::Tab::Home;
     const std::string name(tab);
     if (name == "friends") return launcher::Tab::Friends;
+    if (name == "messages") return launcher::Tab::Messages;
     if (name == "invites") return launcher::Tab::Invites;
     if (name == "achievements") return launcher::Tab::Achievements;
     return launcher::Tab::Home;
@@ -115,6 +118,8 @@ int main(int, char**) {
     const char* switch_xuid = std::getenv("XENONLIVE_SWITCH");
     const char* profile_tag = std::getenv("XENONLIVE_PROFILE");
     bool profile_compare = false;
+    const char* message_tag = std::getenv("XENONLIVE_MESSAGE");
+    const char* say = std::getenv("XENONLIVE_SAY");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -165,6 +170,19 @@ int main(int, char**) {
                 profile_compare = true;
                 break;
             }
+        }
+        if (message_tag && app.signed_in() && app.client->online()) {
+            for (const auto& f : app.client->friends()) {
+                if (f.gamertag != message_tag) continue;
+                app.OpenConversation(f.xuid, f.gamertag);
+                message_tag = nullptr;
+                break;
+            }
+        }
+        if (say && !message_tag && app.messages.peer != 0 && app.messages.conversation_loaded) {
+            std::snprintf(app.messages.draft, sizeof(app.messages.draft), "%s", say);
+            app.SendDraft();
+            say = nullptr;
         }
         if (profile_compare && app.profile.card_loaded && app.profile.compare_title == 0 &&
             !app.profile.card.card.titles.empty()) {

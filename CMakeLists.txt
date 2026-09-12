@@ -76,6 +76,7 @@ add_executable(xenonlive_launcher
     src/screens/signin.cpp
     src/screens/home.cpp
     src/screens/friends.cpp
+    src/screens/messages.cpp
     src/screens/invites.cpp
     src/screens/achievements.cpp
     src/screens/profile.cpp

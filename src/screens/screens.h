@@ -16,6 +16,7 @@ std::string PresenceLine(const xlive::Client::Presence& p);
 void DrawSignIn(App& app);
 void DrawHome(App& app);
 void DrawFriends(App& app);
+void DrawMessages(App& app);
 void DrawInvites(App& app);
 void DrawAchievements(App& app);
 void DrawProfile(App& app);

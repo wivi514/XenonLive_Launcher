@@ -67,6 +67,15 @@ A single window with a rail of tabs:
   menus"). Add by gamertag, accept, decline, remove, block, and *Invite* —
   enabled once the game you are running is in a session, because an
   invitation names the session.
+- **Messages** — the people you have written to (newest first, unread
+  count on each), then the rest of your friends; the conversation as
+  bubbles, yours in green; a box to write in with the count against the
+  256-character limit (Enter sends, Ctrl+Enter breaks a line). The server
+  keeps the last 20 messages between two people and that is what is shown.
+  A message arriving is a notification with a *Reply* button — in the
+  launcher and, through the overlay, in the game — and a badge on the
+  Messages blade until it is read. *Message* on a friend's row and on their
+  profile opens the conversation.
 - **A friend's profile** — from their name or *Profile* on the Friends tab:
   gamerscore, country, member since, presence, the same Invite / Remove /
   Accept buttons, and every title with how far they are in it. *Compare
@@ -94,8 +103,9 @@ counts on a player having a launcher and a game connected at once.
 `overlay/` is a second product of this repo: a static library a port links
 to get a Steam-style overlay inside the game — **Shift+Tab** (or **Back+Start**
 on a pad) opens a panel over the running title with the friends list
-(presence, *Invite*), the invitation inbox (*Accept* / *Decline*), the
-title's achievements (tile, name, description, score, unlock date; what you
+(presence, *Invite*), the invitation inbox (*Accept* / *Decline*), messages
+(read a conversation, reply from the keyboard; a message arriving mid-game
+is a toast with "Shift+Tab to reply"), the title's achievements (tile, name, description, score, unlock date; what you
 have and what you have not, secret ones hidden until earned) and
 notifications that show even while it is closed: an invitation arriving,
 a friend coming online, an achievement unlocking.
@@ -233,12 +243,14 @@ screen (the acceptance run in `PLAN.md` uses them):
 | Variable | Effect |
 |---|---|
 | `XENONLIVE_SCREENSHOT=file.bmp` | saves the window after two seconds and keeps going |
-| `XENONLIVE_TAB=home\|friends\|invites\|achievements` | the starting tab |
+| `XENONLIVE_TAB=home\|friends\|messages\|invites\|achievements` | the starting tab |
 | `XENONLIVE_PLAY=1` | presses Play on the first title once signed in |
 | `XENONLIVE_ACCEPT=1` | presses Accept on the first invitation in the inbox |
 | `XENONLIVE_INSTALL=case_west` | presses Install on that game |
 | `XENONLIVE_SWITCH=<xuid hex>` | presses Use on that saved account |
 | `XENONLIVE_PROFILE=<gamertag>` | opens that friend's profile and presses Compare on the first title |
+| `XENONLIVE_MESSAGE=<gamertag>` | opens the conversation with that friend |
+| `XENONLIVE_SAY=<text>` | then sends that message |
 | `XENONLIVE_SCREENSHOT_MS=5000` | takes the screenshot later than two seconds |
 
 With `SDL_VIDEODRIVER=offscreen` the whole thing runs without a display.
@@ -273,7 +285,7 @@ src/
   sha256.h / .cpp        SHA-256
   launch.h / launch.cpp  starting a title and noticing it stop
   toasts.h / toasts.cpp  notifications
-  screens/               one function per tab (profile.cpp is the friend page)
+  screens/               one function per tab (profile.cpp the friend page, messages.cpp the inbox)
 tools/fetch_thirdparty.sh  re-vendors ImGui and miniz
 PLAN.md                  what this was built from
 ```

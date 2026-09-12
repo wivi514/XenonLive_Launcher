@@ -28,7 +28,7 @@ namespace launcher {
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
-enum class Tab { Home, Friends, Invites, Achievements, Profile };
+enum class Tab { Home, Friends, Messages, Invites, Achievements, Profile };
 
 // A ticket the UI issued for a fire-and-forget action. Every one is collected
 // — the library holds a result until someone does — and a failure is toasted
@@ -139,6 +139,33 @@ public:
     } profile;
     void OpenProfile(uint64_t xuid, const std::string& gamertag);
     void LoadCompare(uint32_t title_id);
+
+    // Messages: the inbox (the newest message with each person) and one
+    // open conversation (the last 20 with them). A message arriving while
+    // that conversation is open re-reads it; otherwise it counts as unread
+    // on that person until they are opened, and shows as a notification
+    // with a Reply button either way.
+    struct MessagesState {
+        xlive::Client::Ticket inbox_ticket = 0;
+        std::vector<xlive::Client::Message> inbox;
+        bool inbox_loaded = false;
+        uint64_t peer = 0;
+        std::string peer_gamertag;
+        xlive::Client::Ticket conversation_ticket = 0;
+        std::vector<xlive::Client::Message> conversation;
+        bool conversation_loaded = false;
+        std::string error;
+        // Bytes; the character count is checked at send time.
+        char draft[1024] = {};
+        xlive::Client::Ticket send_ticket = 0;
+        std::map<uint64_t, int> unread;
+        bool scroll_to_end = false;
+        bool focus_draft = false;
+    } messages;
+    void RefreshInbox();
+    void OpenConversation(uint64_t xuid, const std::string& gamertag);
+    void SendDraft();
+    int unread_messages() const;
 
     // Records a ticket to be collected. `what` names the action for the
     // failure toast ("Add friend", "Send invite").

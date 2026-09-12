@@ -77,6 +77,8 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
                                   "session you are in.");
             }
             ImGui::SameLine();
+            if (ImGui::SmallButton("Message")) app.OpenConversation(f.xuid, f.gamertag);
+            ImGui::SameLine();
             if (ImGui::SmallButton("Remove")) {
                 app.Issue(app.client->RemoveFriend(f.xuid), "Remove " + f.gamertag);
             }
