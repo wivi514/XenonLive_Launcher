@@ -139,6 +139,20 @@ Image ImageCache::Get(const std::string& key, const std::string& path, const std
     return {};
 }
 
+Image ImageCache::Local(const std::filesystem::path& file) {
+    if (!renderer_) return {};
+    const std::string key = "local:" + file.string();
+    if (auto found = loaded_.find(key); found != loaded_.end()) return found->second;
+    if (missing_.count(key)) return {};
+    Image image;
+    if (Decode(key, file, image)) {
+        loaded_[key] = image;
+        return image;
+    }
+    missing_.insert(key);
+    return {};
+}
+
 bool ImageCache::Decode(const std::string& key, const std::filesystem::path& file, Image& out) {
     std::FILE* in = std::fopen(file.string().c_str(), "rb");
     if (!in) return false;

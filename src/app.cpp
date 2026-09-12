@@ -358,6 +358,83 @@ void App::PollPending() {
         }
     }
 
+    if (issues.send_ticket != 0) {
+        xlive::Client::IssueResult result;
+        const auto status = client->Poll(issues.send_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            issues.send_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                // Sent: the capture leaves the disk, the form clears, and
+                // the report shows up in the search at once.
+                for (const Capture& c : issues.captures) {
+                    if (c.id != issues.sending) continue;
+                    std::string error;
+                    if (!RemoveCapture(c, error)) toasts.Push(error, 8.0);
+                    break;
+                }
+                issues.form_for.clear();
+                std::memset(issues.title, 0, sizeof(issues.title));
+                std::memset(issues.summary, 0, sizeof(issues.summary));
+                std::memset(issues.steps, 0, sizeof(issues.steps));
+                issues.error.clear();
+                issues.selected_capture = -1;
+                RescanCaptures();
+                toasts.Push("Bug report sent: " + result.issue.title, 6.0);
+                // The report joins the list on the left. A search still
+                // running would overwrite it, so that one is redone.
+                if (issues.search_ticket == 0) {
+                    issues.results.insert(issues.results.begin(), result.issue);
+                    issues.searched = true;
+                } else {
+                    issues.refresh_after_search = true;
+                }
+            } else {
+                std::string why = result.error;
+                if (result.error == "too_many_reports") why = "at most 10 reports a day";
+                else if (result.error == "unreadable_file") why = "could not read " + result.failed_file;
+                else if (result.error == "too_large" || result.error == "report_too_big") {
+                    why = result.failed_file + " is too big (4 MiB a file, 8 MiB a report)";
+                } else if (result.error == "not_text_or_image") {
+                    why = result.failed_file + " is neither an image nor text";
+                }
+                issues.error = "Not sent: " + why;
+            }
+            issues.sending.clear();
+        }
+    }
+    if (issues.search_ticket != 0) {
+        xlive::Client::IssueResult result;
+        const auto status = client->Poll(issues.search_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            issues.search_ticket = 0;
+            issues.searched = true;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                issues.results = std::move(result.issues);
+                issues.search_error.clear();
+            } else {
+                issues.search_error = result.error;
+            }
+            issues.selected_report = -1;
+            if (issues.refresh_after_search) {
+                issues.refresh_after_search = false;
+                SearchIssues();
+            }
+        }
+    }
+    if (issues.delete_ticket != 0) {
+        xlive::Client::IssueResult result;
+        const auto status = client->Poll(issues.delete_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            issues.delete_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                toasts.Push("Report deleted", 4.0);
+                SearchIssues();
+            } else {
+                toasts.Push("Could not delete the report: " + result.error, 6.0);
+            }
+        }
+    }
+
     if (signin.ticket != 0) {
         xlive::Client::SocialResult result;
         const auto status = client->Poll(signin.ticket, result);
@@ -461,6 +538,106 @@ int App::unread_messages() const {
     int n = 0;
     for (const auto& [xuid, count] : messages.unread) n += count;
     return n;
+}
+
+// -- bug reports --------------------------------------------------------------
+
+void App::RescanCaptures() {
+    issues.captures = client ? ScanCaptures(client->captures_dir()) : std::vector<Capture>{};
+    issues.scanned = true;
+    if (issues.selected_capture >= int(issues.captures.size())) issues.selected_capture = -1;
+    // The form follows its capture by id, not by index: a scan that
+    // finds a new one first must not hand this form to it.
+    if (!issues.form_for.empty()) {
+        int at = -1;
+        for (size_t i = 0; i < issues.captures.size(); ++i) {
+            if (issues.captures[i].id == issues.form_for) at = int(i);
+        }
+        issues.selected_capture = at;
+    }
+}
+
+void App::SelectCapture(int index) {
+    if (index < 0 || index >= int(issues.captures.size())) {
+        issues.selected_capture = -1;
+        return;
+    }
+    issues.selected_capture = index;
+    issues.selected_report = -1;
+    const std::string& id = issues.captures[size_t(index)].id;
+    if (issues.form_for != id) {
+        issues.form_for = id;
+        std::memset(issues.title, 0, sizeof(issues.title));
+        std::memset(issues.summary, 0, sizeof(issues.summary));
+        std::memset(issues.steps, 0, sizeof(issues.steps));
+        issues.error.clear();
+    }
+}
+
+void App::SendCapture() {
+    if (!client || issues.send_ticket != 0 || issues.selected_capture < 0 ||
+        issues.selected_capture >= int(issues.captures.size())) {
+        return;
+    }
+    const Capture& c = issues.captures[size_t(issues.selected_capture)];
+    if (!c.problem.empty()) {
+        issues.error = "This capture cannot be sent: " + c.problem;
+        return;
+    }
+    xlive::Client::IssueDraft draft;
+    draft.title_id = c.title_id;
+    draft.game_version = c.game_version;
+    draft.title = issues.title;
+    draft.summary = issues.summary;
+    draft.steps = issues.steps;
+    draft.captured_at = c.captured_at;
+    draft.system_json = c.system_json;
+    for (const CaptureFile& f : c.files) draft.files.push_back({f.name, f.path.string()});
+    // Trimmed the way the server trims, so "   " is caught here.
+    const auto blank = [](const std::string& s) {
+        return s.find_first_not_of(" \t\r\n") == std::string::npos;
+    };
+    if (blank(draft.title)) {
+        issues.error = "Give it a title.";
+        return;
+    }
+    if (blank(draft.summary)) {
+        issues.error = "Say what happened.";
+        return;
+    }
+    issues.error.clear();
+    issues.sending = c.id;
+    issues.send_ticket = client->ReportIssue(draft);
+}
+
+void App::DeleteCapture() {
+    if (issues.selected_capture < 0 || issues.selected_capture >= int(issues.captures.size())) return;
+    const Capture c = issues.captures[size_t(issues.selected_capture)];
+    std::string error;
+    if (!RemoveCapture(c, error)) {
+        toasts.Push(error, 8.0);
+        return;
+    }
+    if (issues.form_for == c.id) {
+        issues.form_for.clear();
+        std::memset(issues.title, 0, sizeof(issues.title));
+        std::memset(issues.summary, 0, sizeof(issues.summary));
+        std::memset(issues.steps, 0, sizeof(issues.steps));
+    }
+    issues.selected_capture = -1;
+    issues.error.clear();
+    RescanCaptures();
+}
+
+void App::SearchIssues() {
+    if (!client || !signed_in() || issues.search_ticket != 0) return;
+    issues.searched_for = issues.query;
+    issues.search_ticket = client->SearchIssues(issues.query);
+}
+
+void App::DeleteReport(int64_t id) {
+    if (!client || issues.delete_ticket != 0) return;
+    issues.delete_ticket = client->DeleteIssue(id);
 }
 
 // -- invites ------------------------------------------------------------------
@@ -705,6 +882,7 @@ void App::HandleEvent(const xlive::Event& event) {
                 if (tab == Tab::Profile) tab = Tab::Friends;
                 profile = ProfileState{};
                 messages = MessagesState{};
+                issues = IssuesState{};
             }
             break;
 
@@ -879,6 +1057,10 @@ void App::DrawRail() {
                 !config.titles.empty()) {
                 LoadAchievements(achievements.title_index < 0 ? 0 : achievements.title_index);
             }
+            if (which == Tab::Issues) {
+                RescanCaptures();
+                if (!issues.searched && issues.search_ticket == 0) SearchIssues();
+            }
         }
     };
     blade("Home", Tab::Home);
@@ -891,6 +1073,13 @@ void App::DrawRail() {
     if (inbox > 0) std::snprintf(badge, sizeof(badge), "%zu", inbox);
     blade("Invites", Tab::Invites, badge);
     blade("Achievements", Tab::Achievements);
+    // Captures waiting for a decision. Scanned once at start and whenever
+    // the tab opens; a port writing one while the launcher sits open is
+    // seen on the next open or Rescan.
+    if (!issues.scanned) RescanCaptures();
+    char waiting[16] = {};
+    if (!issues.captures.empty()) std::snprintf(waiting, sizeof(waiting), "%zu", issues.captures.size());
+    blade("Issues", Tab::Issues, waiting);
     blade("Support", Tab::Support);
 
     // The gamercard, at the bottom.
@@ -917,6 +1106,7 @@ void App::DrawContent() {
         case Tab::Messages:     DrawMessages(*this); break;
         case Tab::Invites:      DrawInvites(*this); break;
         case Tab::Achievements: DrawAchievements(*this); break;
+        case Tab::Issues:       DrawIssues(*this); break;
         case Tab::Support:      DrawSupport(*this); break;
         case Tab::Profile:      DrawProfile(*this); break;
     }

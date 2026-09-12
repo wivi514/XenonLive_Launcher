@@ -22,7 +22,7 @@ namespace {
 
 // Two development hooks, for driving the launcher from a shell with no one
 // at the screen: XENONLIVE_SCREENSHOT=file.bmp saves the window after two
-// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements|support
+// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements|issues|support
 // picks the starting tab; XENONLIVE_PLAY=1 presses Play on the first title
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
 // in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
@@ -33,7 +33,10 @@ namespace {
 // conversation with that friend, and XENONLIVE_SAY=<text> then sends that.
 // XENONLIVE_SIGNIN=register|forgot opens that form; XENONLIVE_FORGOT=<gamertag>
 // asks for a recovery code; XENONLIVE_RECOVER=<gamertag>:<code>:<password>
-// sets a new password with a code already mailed.
+// sets a new password with a code already mailed. XENONLIVE_CAPTURE=<n>
+// selects the n-th capture on the Issues tab; XENONLIVE_ISSUE_SEND="title|what
+// happened|steps" fills the form and sends it; XENONLIVE_ISSUE_SEARCH=<words>
+// searches the reports and selects the first hit.
 // None does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
@@ -58,6 +61,7 @@ launcher::Tab StartingTab() {
     if (name == "messages") return launcher::Tab::Messages;
     if (name == "invites") return launcher::Tab::Invites;
     if (name == "achievements") return launcher::Tab::Achievements;
+    if (name == "issues") return launcher::Tab::Issues;
     if (name == "support") return launcher::Tab::Support;
     return launcher::Tab::Home;
 }
@@ -129,6 +133,10 @@ int main(int, char**) {
         if (std::string(form) == "forgot") app.signin.mode = launcher::App::SignInState::Mode::Forgot;
     }
     const char* forgot_tag = std::getenv("XENONLIVE_FORGOT");
+    const char* capture_index = std::getenv("XENONLIVE_CAPTURE");
+    const char* issue_send = std::getenv("XENONLIVE_ISSUE_SEND");
+    const char* issue_search = std::getenv("XENONLIVE_ISSUE_SEARCH");
+    bool issue_select_hit = false;
     const char* recover = std::getenv("XENONLIVE_RECOVER");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -190,6 +198,41 @@ int main(int, char**) {
                 std::fprintf(stderr, "[launcher] XENONLIVE_RECOVER wants gamertag:code:password\n");
             }
             recover = nullptr;
+        }
+        if (capture_index && app.issues.scanned) {
+            app.tab = launcher::Tab::Issues;
+            app.SelectCapture(int(std::strtol(capture_index, nullptr, 10)));
+            capture_index = nullptr;
+        }
+        if (issue_send && !capture_index && app.issues.selected_capture >= 0 && app.signed_in() &&
+            app.client->online()) {
+            const std::string spec(issue_send);
+            const auto a = spec.find('|');
+            const auto b = a == std::string::npos ? a : spec.find('|', a + 1);
+            std::snprintf(app.issues.title, sizeof(app.issues.title), "%s", spec.substr(0, a).c_str());
+            if (a != std::string::npos) {
+                std::snprintf(app.issues.summary, sizeof(app.issues.summary), "%s",
+                              spec.substr(a + 1, b == std::string::npos ? b : b - a - 1).c_str());
+            }
+            if (b != std::string::npos) {
+                std::snprintf(app.issues.steps, sizeof(app.issues.steps), "%s", spec.substr(b + 1).c_str());
+            }
+            app.SendCapture();
+            issue_send = nullptr;
+        }
+        if (issue_search && app.signed_in() && app.client->online() && app.issues.search_ticket == 0) {
+            app.tab = launcher::Tab::Issues;
+            std::snprintf(app.issues.query, sizeof(app.issues.query), "%s", issue_search);
+            app.SearchIssues();
+            issue_search = nullptr;
+            issue_select_hit = true;
+        }
+        if (issue_select_hit && app.issues.search_ticket == 0 && app.issues.searched) {
+            if (!app.issues.results.empty()) {
+                app.issues.selected_report = 0;
+                app.issues.selected_capture = -1;
+            }
+            issue_select_hit = false;
         }
         if (install_key && app.signed_in()) {
             if (const launcher::CatalogGame* game = launcher::CatalogByKey(install_key)) {

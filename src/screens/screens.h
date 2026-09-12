@@ -20,6 +20,7 @@ void DrawMessages(App& app);
 void DrawInvites(App& app);
 void DrawAchievements(App& app);
 void DrawProfile(App& app);
+void DrawIssues(App& app);
 void DrawSupport(App& app);
 
 }  // namespace launcher

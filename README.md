@@ -91,6 +91,14 @@ A single window with a rail of tabs:
   ones read "Secret achievement" with no art until unlocked. The art is the
   SPA's own, served by the server and cached under `launcher/images/` since
   it never changes.
+- **Issues** — bug reports. A port's capture key writes a screenshot, the
+  log around the moment and the machine under `captures/` (the format is
+  XenonLive's `docs/bug-reports.md`); this tab lists them, shows exactly
+  what would go, and takes a title, what happened and how to reproduce
+  before *Send* — or *Delete* if it was nothing. The same tab searches
+  every report's words, with its state (open, fixed, closed), so a bug is
+  found before it is reported twice. Only the developer ever sees the
+  files and the machine.
 - **Support** — a word about who makes this, a link to GitHub Sponsors,
   and the ports' repositories for bug reports and pull requests. The links
   are one table in `screens/support.cpp`; a new one is one line.

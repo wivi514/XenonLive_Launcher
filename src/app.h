@@ -15,6 +15,7 @@
 #include <vector>
 
 #include "accounts.h"
+#include "captures.h"
 #include "catalog.h"
 #include "config.h"
 #include "images.h"
@@ -28,7 +29,7 @@ namespace launcher {
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
-enum class Tab { Home, Friends, Messages, Invites, Achievements, Support, Profile };
+enum class Tab { Home, Friends, Messages, Invites, Achievements, Issues, Support, Profile };
 
 // A ticket the UI issued for a fire-and-forget action. Every one is collected
 // — the library holds a result until someone does — and a failure is toasted
@@ -181,6 +182,41 @@ public:
     void OpenConversation(uint64_t xuid, const std::string& gamertag);
     void SendDraft();
     int unread_messages() const;
+
+    // -- bug reports ---------------------------------------------------------
+    // A port's captures wait under <data dir>/captures/ until the player
+    // sends or deletes them here; every player's reports are searchable.
+    struct IssuesState {
+        std::vector<Capture> captures;
+        bool scanned = false;
+        // What the left column points at: a capture, or a report.
+        int selected_capture = -1;
+        int selected_report = -1;
+        // The form for the selected capture. Kept per capture id so
+        // switching between two does not lose either.
+        std::string form_for;
+        char title[160] = {};
+        char summary[4096] = {};
+        char steps[4096] = {};
+        xlive::Client::Ticket send_ticket = 0;
+        std::string sending;  // the capture id being sent
+        std::string error;
+        // The search.
+        char query[256] = {};
+        xlive::Client::Ticket search_ticket = 0;
+        std::vector<xlive::Client::Issue> results;
+        bool searched = false;
+        std::string searched_for;
+        std::string search_error;
+        bool refresh_after_search = false;
+        xlive::Client::Ticket delete_ticket = 0;
+    } issues;
+    void RescanCaptures();
+    void SelectCapture(int index);
+    void SendCapture();
+    void DeleteCapture();
+    void SearchIssues();
+    void DeleteReport(int64_t id);
 
     // Records a ticket to be collected. `what` names the action for the
     // failure toast ("Add friend", "Send invite").

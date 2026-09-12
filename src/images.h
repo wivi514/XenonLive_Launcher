@@ -49,6 +49,9 @@ public:
     Image Achievement(uint32_t title_id, uint16_t achievement_id);
     // The title's own tile.
     Image Title(uint32_t title_id);
+    // A file on this machine — a capture's screenshot — decoded once and
+    // kept for the session. A null texture when it does not decode.
+    Image Local(const std::filesystem::path& file);
 
 private:
     Image Get(const std::string& key, const std::string& path, const std::string& file);
