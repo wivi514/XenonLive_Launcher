@@ -82,6 +82,7 @@ add_executable(xenonlive_launcher
     src/screens/profile.cpp
     src/captures.cpp
     src/screens/issues.cpp
+    src/screens/account.cpp
     src/screens/support.cpp
 )
 target_include_directories(xenonlive_launcher PRIVATE

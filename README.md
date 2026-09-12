@@ -91,6 +91,10 @@ A single window with a rail of tabs:
   ones read "Secret achievement" with no art until unlocked. The art is the
   SPA's own, served by the server and cached under `launcher/images/` since
   it never changes.
+- **Account** — from the gamercard at the bottom of the rail (or *Account*
+  on Home): the recovery email (add, change, remove — with the same promise
+  as at registration), the two-letter country, and a password change that
+  signs every other device out.
 - **Issues** — bug reports. A port's capture key writes a screenshot, the
   log around the moment and the machine under `captures/` (the format is
   XenonLive's `docs/bug-reports.md`); this tab lists them, shows exactly

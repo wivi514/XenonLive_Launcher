@@ -22,7 +22,7 @@ namespace {
 
 // Two development hooks, for driving the launcher from a shell with no one
 // at the screen: XENONLIVE_SCREENSHOT=file.bmp saves the window after two
-// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements|issues|support
+// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements|issues|support|account
 // picks the starting tab; XENONLIVE_PLAY=1 presses Play on the first title
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
 // in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
@@ -36,7 +36,8 @@ namespace {
 // sets a new password with a code already mailed. XENONLIVE_CAPTURE=<n>
 // selects the n-th capture on the Issues tab; XENONLIVE_ISSUE_SEND="title|what
 // happened|steps" fills the form and sends it; XENONLIVE_ISSUE_SEARCH=<words>
-// searches the reports and selects the first hit.
+// searches the reports and selects the first hit. XENONLIVE_SET_EMAIL=<addr>
+// saves that recovery email from the account screen ("" removes it).
 // None does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
@@ -62,6 +63,7 @@ launcher::Tab StartingTab() {
     if (name == "invites") return launcher::Tab::Invites;
     if (name == "achievements") return launcher::Tab::Achievements;
     if (name == "issues") return launcher::Tab::Issues;
+    if (name == "account") return launcher::Tab::Account;
     if (name == "support") return launcher::Tab::Support;
     return launcher::Tab::Home;
 }
@@ -137,6 +139,7 @@ int main(int, char**) {
     const char* issue_send = std::getenv("XENONLIVE_ISSUE_SEND");
     const char* issue_search = std::getenv("XENONLIVE_ISSUE_SEARCH");
     bool issue_select_hit = false;
+    const char* set_email = std::getenv("XENONLIVE_SET_EMAIL");
     const char* recover = std::getenv("XENONLIVE_RECOVER");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
@@ -198,6 +201,13 @@ int main(int, char**) {
                 std::fprintf(stderr, "[launcher] XENONLIVE_RECOVER wants gamertag:code:password\n");
             }
             recover = nullptr;
+        }
+        if (set_email && app.signed_in() && app.client->online()) {
+            app.OpenAccount();
+            std::snprintf(app.account.email, sizeof(app.account.email), "%s", set_email);
+            app.account.email_filled = true;
+            app.SaveEmail(*set_email == '\0');
+            set_email = nullptr;
         }
         if (capture_index && app.issues.scanned) {
             app.tab = launcher::Tab::Issues;

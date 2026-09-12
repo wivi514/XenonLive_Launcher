@@ -29,7 +29,7 @@ namespace launcher {
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
-enum class Tab { Home, Friends, Messages, Invites, Achievements, Issues, Support, Profile };
+enum class Tab { Home, Friends, Messages, Invites, Achievements, Issues, Support, Profile, Account };
 
 // A ticket the UI issued for a fire-and-forget action. Every one is collected
 // — the library holds a result until someone does — and a failure is toasted
@@ -211,6 +211,29 @@ public:
         bool refresh_after_search = false;
         xlive::Client::Ticket delete_ticket = 0;
     } issues;
+    // -- the account screen ------------------------------------------------
+    // The few things a player may change about themselves: the recovery
+    // email, the country, the password. Opened from the gamercard.
+    struct AccountState {
+        char email[256] = {};
+        bool email_filled = false;  // from identity, once per open
+        xlive::Client::Ticket email_ticket = 0;
+        std::string email_error;
+        char country[4] = {};
+        bool country_filled = false;
+        xlive::Client::Ticket country_ticket = 0;
+        std::string country_error;
+        char current[128] = {};
+        char next[128] = {};
+        char confirm[128] = {};
+        xlive::Client::Ticket password_ticket = 0;
+        std::string password_error;
+    } account;
+    void OpenAccount();
+    void SaveEmail(bool clear);
+    void SaveCountry(bool clear);
+    void ChangePassword();
+
     void RescanCaptures();
     void SelectCapture(int index);
     void SendCapture();

@@ -172,7 +172,9 @@ void DrawHome(App& app) {
     ImGui::TextDisabled("%s", app.client->status().c_str());
     ImGui::TextDisabled("%s", app.client->gateway_connected() ? "live updates on"
                                                                : "live updates off");
-    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 190.0f);
+    ImGui::SameLine(ImGui::GetContentRegionAvail().x - 262.0f);
+    if (ImGui::SmallButton("Account")) app.OpenAccount();
+    ImGui::SameLine();
     if (ImGui::SmallButton("Switch account")) ImGui::OpenPopup("switch");
     ImGui::SameLine();
     if (ImGui::SmallButton("Sign out")) app.SignOut();

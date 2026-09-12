@@ -358,6 +358,35 @@ void App::PollPending() {
         }
     }
 
+    // The account screen's three tickets: one toast or one line each.
+    const auto collect = [&](xlive::Client::Ticket& ticket, std::string& error,
+                             const char* done, auto on_ok) {
+        if (ticket == 0) return;
+        xlive::Client::SocialResult result;
+        const auto status = client->Poll(ticket, result);
+        if (status == xlive::Client::OpStatus::Pending) return;
+        ticket = 0;
+        if (status == xlive::Client::OpStatus::Succeeded) {
+            error.clear();
+            toasts.Push(done, 4.0);
+            on_ok();
+        } else {
+            error = result.error.empty() ? "unknown" : result.error;
+        }
+    };
+    collect(account.email_ticket, account.email_error, "Recovery email saved", [&] {
+        account.email_filled = false;
+    });
+    collect(account.country_ticket, account.country_error, "Country saved", [&] {
+        account.country_filled = false;
+    });
+    collect(account.password_ticket, account.password_error,
+            "Password changed; every other device is signed out", [&] {
+                std::memset(account.current, 0, sizeof(account.current));
+                std::memset(account.next, 0, sizeof(account.next));
+                std::memset(account.confirm, 0, sizeof(account.confirm));
+            });
+
     if (issues.send_ticket != 0) {
         xlive::Client::IssueResult result;
         const auto status = client->Poll(issues.send_ticket, result);
@@ -538,6 +567,51 @@ int App::unread_messages() const {
     int n = 0;
     for (const auto& [xuid, count] : messages.unread) n += count;
     return n;
+}
+
+// -- the account screen --------------------------------------------------------
+
+void App::OpenAccount() {
+    tab = Tab::Account;
+    account.email_filled = false;
+    account.country_filled = false;
+    account.email_error.clear();
+    account.country_error.clear();
+    account.password_error.clear();
+}
+
+void App::SaveEmail(bool clear) {
+    if (!client || account.email_ticket != 0) return;
+    xlive::Client::ProfileUpdate update;
+    update.email_set = true;
+    update.email = clear ? std::string() : std::string(account.email);
+    if (clear) std::memset(account.email, 0, sizeof(account.email));
+    account.email_error.clear();
+    account.email_ticket = client->UpdateProfile(update);
+}
+
+void App::SaveCountry(bool clear) {
+    if (!client || account.country_ticket != 0) return;
+    xlive::Client::ProfileUpdate update;
+    update.country_set = true;
+    update.country = clear ? std::string() : std::string(account.country);
+    if (clear) std::memset(account.country, 0, sizeof(account.country));
+    account.country_error.clear();
+    account.country_ticket = client->UpdateProfile(update);
+}
+
+void App::ChangePassword() {
+    if (!client || account.password_ticket != 0) return;
+    if (std::strcmp(account.next, account.confirm) != 0) {
+        account.password_error = "mismatch";
+        return;
+    }
+    if (std::strlen(account.next) < 8) {
+        account.password_error = "bad_password";
+        return;
+    }
+    account.password_error.clear();
+    account.password_ticket = client->ChangePassword(account.current, account.next);
 }
 
 // -- bug reports --------------------------------------------------------------
@@ -883,6 +957,8 @@ void App::HandleEvent(const xlive::Event& event) {
                 profile = ProfileState{};
                 messages = MessagesState{};
                 issues = IssuesState{};
+                account = AccountState{};
+                if (tab == Tab::Account) tab = Tab::Home;
             }
             break;
 
@@ -1086,8 +1162,11 @@ void App::DrawRail() {
     const float card_h = fonts.heading->FontSize + ImGui::GetTextLineHeight() * 2.0f + 26.0f;
     ImGui::SetCursorPosY(ImGui::GetWindowHeight() - card_h - 14.0f);
     const bool online = client && client->online();
-    theme::Gamercard(gamertag().c_str(), client ? client->identity().gamerscore : 0u, online,
-                     online ? "online" : "offline");
+    if (theme::Gamercard(gamertag().c_str(), client ? client->identity().gamerscore : 0u, online,
+                         online ? "online" : "offline") &&
+        signed_in()) {
+        OpenAccount();
+    }
     ImGui::EndChild();
     ImGui::PopStyleColor();
 }
@@ -1109,6 +1188,7 @@ void App::DrawContent() {
         case Tab::Issues:       DrawIssues(*this); break;
         case Tab::Support:      DrawSupport(*this); break;
         case Tab::Profile:      DrawProfile(*this); break;
+        case Tab::Account:      DrawAccount(*this); break;
     }
     ImGui::EndChild();
 }

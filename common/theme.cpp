@@ -174,7 +174,7 @@ bool RailItem(const char* label, bool selected, const char* badge) {
     return clicked;
 }
 
-void Gamercard(const char* gamertag, unsigned gamerscore, bool online, const char* status,
+bool Gamercard(const char* gamertag, unsigned gamerscore, bool online, const char* status,
                float width) {
     const ImGuiStyle& style = ImGui::GetStyle();
     if (width <= 0.0f) width = ImGui::GetContentRegionAvail().x;
@@ -185,8 +185,12 @@ void Gamercard(const char* gamertag, unsigned gamerscore, bool online, const cha
     const float height = pad * 2.0f + name_h + line_h * (status && *status ? 2.0f : 1.0f) + 6.0f;
     ImDrawList* draw = ImGui::GetWindowDrawList();
     const ImVec2 max(pos.x + width, pos.y + height);
+    ImGui::PushID(gamertag);
+    const bool clicked = ImGui::InvisibleButton("##gamercard", ImVec2(width, height));
+    ImGui::PopID();
+    const bool hovered = ImGui::IsItemHovered();
     // A green tile with a gloss, the way the dashboard's card was.
-    draw->AddRectFilled(pos, max, Col(kGreen), style.ChildRounding);
+    draw->AddRectFilled(pos, max, Col(hovered ? kGreenHi : kGreen), style.ChildRounding);
     draw->AddRectFilledMultiColor(pos, ImVec2(max.x, pos.y + height * 0.45f),
                                   IM_COL32(255, 255, 255, 40), IM_COL32(255, 255, 255, 40),
                                   IM_COL32(255, 255, 255, 0), IM_COL32(255, 255, 255, 0));
@@ -209,7 +213,7 @@ void Gamercard(const char* gamertag, unsigned gamerscore, bool online, const cha
         draw->AddCircleFilled(ImVec2(pos.x + pad + r, y + line_h * 0.5f), r * 0.5f, dot);
         draw->AddText(ImVec2(pos.x + pad + r * 2.0f + 6.0f, y), IM_COL32(235, 245, 230, 230), status);
     }
-    ImGui::Dummy(ImVec2(width, height));
+    return clicked;
 }
 
 void GlossLastItem() {

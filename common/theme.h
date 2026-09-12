@@ -55,7 +55,8 @@ bool RailItem(const char* label, bool selected, const char* badge = nullptr);
 
 // The gamercard tile: gamertag in the heading face over a gamerscore line,
 // with a status dot. `status` is "online", "offline", or a longer line.
-void Gamercard(const char* gamertag, unsigned gamerscore, bool online, const char* status,
+// Returns true when clicked; the rail opens the account screen on it.
+bool Gamercard(const char* gamertag, unsigned gamerscore, bool online, const char* status,
                float width = 0.0f);
 
 // A gloss over the last item: a translucent highlight on its upper half,
