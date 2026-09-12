@@ -27,6 +27,14 @@ struct CatalogGame {
 };
 
 const std::vector<CatalogGame>& Catalog();
+// The launcher itself, as a catalog entry: the same release shape (bundle,
+// asset names, SHA256SUMS) so the installer can fetch it, and key
+// "launcher" so the App knows to apply it to itself rather than to a
+// games directory. Not in Catalog(): the Home tab lists games.
+const CatalogGame& LauncherSelf();
+// What this binary was built as: "1.0.0", or "dev" for a build from a tree,
+// which never offers to update itself.
+const char* LauncherVersion();
 const CatalogGame* CatalogByKey(std::string_view key);
 const CatalogGame* CatalogByTitle(uint32_t title_id);
 

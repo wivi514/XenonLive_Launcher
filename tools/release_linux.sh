@@ -85,7 +85,7 @@ B="\$ROOT/build-release-oldbase"
 rm -rf "\$B"
 cmake -S "\$ROOT" -B "\$B" -G Ninja -DCMAKE_BUILD_TYPE=Release \\
     -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ \\
-    -DXLIVE_ROOT="\$XLIVE_ROOT" -DXENONLIVE_RELEASE=ON \\
+    -DXLIVE_ROOT="\$XLIVE_ROOT" -DXENONLIVE_RELEASE=ON -DXL_VERSION="\$VERSION" \\
     -DCMAKE_PREFIX_PATH="\$SDL2PFX;\$OB/curl" -DOPENSSL_USE_STATIC_LIBS=ON >/dev/null
 cmake --build "\$B" -j\$(nproc)
 

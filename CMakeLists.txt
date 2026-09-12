@@ -81,6 +81,7 @@ add_executable(xenonlive_launcher
     src/screens/achievements.cpp
     src/screens/profile.cpp
     src/captures.cpp
+    src/selfupdate.cpp
     src/screens/issues.cpp
     src/screens/account.cpp
     src/screens/support.cpp
@@ -102,7 +103,12 @@ target_compile_options(xenonlive_launcher PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wshadow>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
+# The version the binary reports and compares against the launcher's own
+# GitHub releases. The release scripts pass their XL_VERSION; a dev build
+# says "dev" and never offers to update itself.
+set(XL_VERSION "dev" CACHE STRING "Version stamped into the launcher (the release scripts set it)")
 target_compile_definitions(xenonlive_launcher PRIVATE
+    XENONLIVE_VERSION="${XL_VERSION}"
     $<$<BOOL:${WIN32}>:NOMINMAX WIN32_LEAN_AND_MEAN _CRT_SECURE_NO_WARNINGS>
 )
 # SDL2main before SDL2: it is a static archive whose WinMain calls into the

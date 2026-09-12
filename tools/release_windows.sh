@@ -86,7 +86,7 @@ B="\$ROOT/build-release-mingw"
 rm -rf "\$B"
 cmake -S "\$ROOT" -B "\$B" -G Ninja -DCMAKE_TOOLCHAIN_FILE="\$TC" -DCMAKE_BUILD_TYPE=Release \\
     -DXL_MINGW_PREFIX="\$MW/sdl2;\$MW/curl" -DCMAKE_PREFIX_PATH="\$MW/sdl2;\$MW/curl" \\
-    -DXLIVE_ROOT="\$XLIVE_ROOT" -DXENONLIVE_RELEASE=ON
+    -DXLIVE_ROOT="\$XLIVE_ROOT" -DXENONLIVE_RELEASE=ON -DXL_VERSION="\$VERSION"
 cmake --build "\$B" -j\$(nproc)
 
 echo "==> stage"

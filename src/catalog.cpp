@@ -58,6 +58,21 @@ const CatalogGame* CatalogByKey(std::string_view key) {
     return nullptr;
 }
 
+const CatalogGame& LauncherSelf() {
+    static const CatalogGame self{"launcher", 0, "XenonLive Launcher",
+                                  "wivi514/XenonLive_Launcher", "XL", "xenonlive_launcher",
+                                  "XenonLiveLauncher"};
+    return self;
+}
+
+const char* LauncherVersion() {
+#ifdef XENONLIVE_VERSION
+    return XENONLIVE_VERSION;
+#else
+    return "dev";
+#endif
+}
+
 const CatalogGame* CatalogByTitle(uint32_t title_id) {
     for (const CatalogGame& game : Catalog()) {
         if (game.title_id == title_id) return &game;

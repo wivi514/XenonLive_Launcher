@@ -7,6 +7,7 @@
 #include "imgui.h"
 #include "paths.h"
 #include "screens/screens.h"
+#include "selfupdate.h"
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -837,10 +838,50 @@ void App::InstallGame(const CatalogGame& item) {
     QueueInstallJob(item.key, true);
 }
 
+namespace {
+
+// A catalog key, or the launcher's own.
+const CatalogGame* EntryByKey(const std::string& key) {
+    if (key == LauncherSelf().key) return &LauncherSelf();
+    return CatalogByKey(key);
+}
+
+// "v1.1.0" and "1.1.0" are the same version.
+std::string BareVersion(std::string tag) {
+    if (!tag.empty() && (tag[0] == 'v' || tag[0] == 'V')) tag.erase(0, 1);
+    return tag;
+}
+
+}  // namespace
+
 void App::CheckReleases() {
     for (const CatalogGame& item : Catalog()) QueueInstallJob(item.key, false);
+    // A dev build has nothing to compare against and stays out of it.
+    if (std::string(LauncherVersion()) != "dev") QueueInstallJob(LauncherSelf().key, false);
     last_release_check = ImGui::GetTime();
     next_release_check_ = last_release_check + kReleaseCheckInterval;
+}
+
+bool App::launcher_updating() const {
+    if (installer.busy() && current_job_.install && current_job_.key == LauncherSelf().key) return true;
+    for (const InstallJob& job : install_queue_) {
+        if (job.install && job.key == LauncherSelf().key) return true;
+    }
+    return false;
+}
+
+void App::UpdateLauncher() {
+    std::string why;
+    if (!SelfUpdatePossible(why)) {
+        launcher_update_error = why;
+        return;
+    }
+    if (game.running()) {
+        launcher_update_error = "a game is running; quit it first, the launcher restarts to update";
+        return;
+    }
+    launcher_update_error.clear();
+    QueueInstallJob(LauncherSelf().key, true);
 }
 
 bool App::release_check_running() const {
@@ -876,9 +917,43 @@ void App::PollInstaller() {
     const bool finished = !installer.busy() && (progress.phase == InstallPhase::Done ||
                                                 progress.phase == InstallPhase::Failed);
     if (finished) {
-        const CatalogGame* item = CatalogByKey(progress.key);
+        const CatalogGame* item = EntryByKey(progress.key);
         std::fprintf(stderr, "[installer] %s: %s %s\n", progress.key.c_str(),
                      PhaseName(progress.phase), progress.message.c_str());
+        if (progress.key == LauncherSelf().key) {
+            if (progress.phase == InstallPhase::Failed && current_job_.install) {
+                launcher_update_error = progress.message;
+                toasts.Push("Launcher update failed: " + progress.message, 8.0);
+            } else if (progress.phase == InstallPhase::Failed) {
+                // The launcher's own repository may not answer (private, no
+                // release yet): the log knows, the player is not bothered.
+                std::fprintf(stderr, "[launcher] no launcher release to compare against: %s\n",
+                             progress.message.c_str());
+            } else if (progress.installed) {
+                // Downloaded and verified beside us: swap and go.
+                std::string error;
+                if (ApplySelfUpdate(SelfUpdateStagingDir(), error)) {
+                    std::fprintf(stderr, "[launcher] updated to %s; restarting\n",
+                                 progress.release.tag.c_str());
+                    quit = true;
+                } else {
+                    launcher_update_error = error;
+                    toasts.Push("Launcher update failed: " + error, 8.0);
+                }
+            } else {
+                release_check_error.clear();
+                release_pages[progress.key] = progress.release.html_url;
+                const bool newer = BareVersion(progress.release.tag) != LauncherVersion();
+                launcher_update = newer ? progress.release.tag : std::string();
+                if (newer && announced_updates_.insert("launcher@" + progress.release.tag).second) {
+                    toasts.Push("XenonLive Launcher " + progress.release.tag +
+                                    " is available - update from Home",
+                                8.0);
+                }
+            }
+            installer.Acknowledge();
+            return;
+        }
         if (progress.phase == InstallPhase::Failed && !current_job_.install) {
             // A background check that could not reach GitHub is a line on
             // the Home tab, not a toast every five minutes.
@@ -931,8 +1006,10 @@ void App::PollInstaller() {
         const InstallJob job = install_queue_.front();
         install_queue_.pop_front();
         current_job_ = job;
-        if (const CatalogGame* item = CatalogByKey(job.key)) {
-            if (job.install) {
+        if (const CatalogGame* item = EntryByKey(job.key)) {
+            if (job.install && job.key == LauncherSelf().key) {
+                installer.Install(*item, SelfUpdateStagingDir());
+            } else if (job.install) {
                 installer.Install(*item, config.InstallDir(item->key));
             } else {
                 installer.CheckLatest(*item);
@@ -1155,6 +1232,10 @@ void App::DrawRail() {
     ImGui::SameLine(0.0f, 0.0f);
     ImGui::TextUnformatted("Live");
     ImGui::PopFont();
+    ImGui::SameLine(0.0f, 8.0f);
+    ImGui::SetCursorPosY(ImGui::GetCursorPosY() + fonts.title->FontSize - ImGui::GetTextLineHeight() - 2.0f);
+    ImGui::TextColored(launcher_update.empty() ? theme::kMuted : theme::kAmber, "%s%s",
+                       LauncherVersion(), launcher_update.empty() ? "" : " *");
     ImGui::Dummy(ImVec2(0.0f, 10.0f));
 
     const auto blade = [&](const char* label, Tab which, theme::Icon icon,

@@ -11,6 +11,7 @@
 #include <string>
 
 #include "app.h"
+#include "selfupdate.h"
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
@@ -38,6 +39,10 @@ namespace {
 // happened|steps" fills the form and sends it; XENONLIVE_ISSUE_SEARCH=<words>
 // searches the reports and selects the first hit. XENONLIVE_SET_EMAIL=<addr>
 // saves that recovery email from the account screen ("" removes it).
+// XENONLIVE_APPLY_UPDATE=1 applies whatever is staged in the self-update
+// directory as if the installer had just put it there, and quits;
+// XENONLIVE_FAKE_LAUNCHER_UPDATE=<tag> shows the update banner without asking
+// GitHub.
 // None does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
@@ -140,6 +145,21 @@ int main(int, char**) {
     const char* issue_search = std::getenv("XENONLIVE_ISSUE_SEARCH");
     bool issue_select_hit = false;
     const char* set_email = std::getenv("XENONLIVE_SET_EMAIL");
+    // For a screenshot of the banner: pretend GitHub said this tag.
+    if (const char* fake = std::getenv("XENONLIVE_FAKE_LAUNCHER_UPDATE")) app.launcher_update = fake;
+    if (std::getenv("XENONLIVE_APPLY_UPDATE")) {
+        std::error_code ec;
+        const auto staging = launcher::SelfUpdateStagingDir();
+        if (std::filesystem::is_directory(staging, ec)) {
+            std::string why;
+            if (launcher::ApplySelfUpdate(staging, why)) {
+                std::fprintf(stderr, "[launcher] XENONLIVE_APPLY_UPDATE: applied; quitting\n");
+                app.quit = true;
+            } else {
+                std::fprintf(stderr, "[launcher] XENONLIVE_APPLY_UPDATE: %s\n", why.c_str());
+            }
+        }
+    }
     const char* recover = std::getenv("XENONLIVE_RECOVER");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);

@@ -168,8 +168,17 @@ AppImage runtime honours.
 The launcher checks every catalog game against GitHub's latest release when
 it starts and every five minutes after; there is no button. A newer release
 than the installed one is announced once, with *Update to …* on the card.
-That is one unauthenticated request per game per check — 24 an hour for
-two games, under GitHub's 60 an hour per address. A check that fails shows
+The launcher's own release is checked in the same round: a release build
+(the scripts stamp `XL_VERSION`; a tree build says `dev` and stays out of
+it) shows a banner on Home when GitHub's latest differs, and *Update and
+restart* downloads the new one beside this one, verifies it against the
+release's `SHA256SUMS`, swaps it in and restarts. An AppImage is renamed
+over `$APPIMAGE`; a tarball install has each file renamed over its old
+self; on Windows a script waits for the .exe to exit, moves the files
+over and starts the new launcher. The launcher's directory has to be
+writable for any of it. That is one unauthenticated request per game (and
+one for the launcher) per check — 36 an hour, under GitHub's 60 an hour
+per address. A check that fails shows
 one amber line on Home and tries again on the next round, never a toast.
 
 A build you point at by hand — a dev tree, say — still works: a `titles` entry

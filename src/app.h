@@ -280,6 +280,14 @@ public:
     double last_release_check = -1.0;
     std::string release_check_error;
     bool release_check_running() const;
+    // The launcher's own release, checked in the same round. Non-empty
+    // when GitHub's latest is not the version this binary was built as.
+    std::string launcher_update;  // the tag, "v1.1.0"
+    std::string launcher_update_error;  // why the last attempt to apply it failed
+    bool launcher_updating() const;
+    // Downloads, verifies and unpacks the newer launcher beside this one,
+    // swaps it in and quits; the new one starts by itself.
+    void UpdateLauncher();
     int TitleIndexForKey(const std::string& key) const;
     // What the install directory holds: "no package yet", "package found",
     // "ready" (the first run has unpacked it).

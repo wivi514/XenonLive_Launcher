@@ -159,6 +159,53 @@ void DrawGame(App& app, const CatalogGame& game) {
 }  // namespace
 
 void DrawHome(App& app) {
+    // -- a newer launcher ------------------------------------------------
+    // One banner, above everything, while GitHub's latest is not what this
+    // binary was built as. Update downloads it beside this one, verifies
+    // it, swaps it in and restarts.
+    if (!app.launcher_update.empty() || app.launcher_updating()) {
+        const InstallProgress progress = app.installer.Poll();
+        const bool working = app.launcher_updating();
+        ImGui::PushStyleColor(ImGuiCol_Border, kAmber);
+        ImGui::BeginChild("launcher_update", ImVec2(0.0f, 0.0f),
+                          ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::PopStyleColor();
+        ImGui::PushFont(app.fonts.heading);
+        ImGui::TextColored(kAmber, "XenonLive Launcher %s is available", app.launcher_update.c_str());
+        ImGui::PopFont();
+        ImGui::SameLine();
+        ImGui::TextDisabled("you have %s", LauncherVersion());
+        if (working) {
+            const char* phase = PhaseName(progress.phase);
+            if (progress.phase == InstallPhase::Downloading && progress.total > 0) {
+                char overlay[64];
+                std::snprintf(overlay, sizeof(overlay), "%s / %s", Megabytes(progress.done).c_str(),
+                              Megabytes(progress.total).c_str());
+                ImGui::ProgressBar(float(double(progress.done) / double(progress.total)),
+                                   ImVec2(-1.0f, 0.0f), overlay);
+            } else {
+                ImGui::ProgressBar(-1.0f * float(ImGui::GetTime()), ImVec2(-1.0f, 0.0f), phase);
+            }
+            ImGui::TextDisabled("The launcher restarts by itself when this is done.");
+        } else {
+            ImGui::PushTextWrapPos(0.0f);
+            ImGui::TextDisabled("Downloaded beside this one and checked against the release's "
+                                "SHA256SUMS, then the launcher restarts as the new version.");
+            ImGui::PopTextWrapPos();
+            if (ImGui::Button("Update and restart")) app.UpdateLauncher();
+            const auto page = app.release_pages.find(LauncherSelf().key);
+            if (page != app.release_pages.end() && !page->second.empty()) {
+                ImGui::SameLine();
+                if (xlive::theme::SmallSecondaryButton("Release notes")) SDL_OpenURL(page->second.c_str());
+            }
+            if (!app.launcher_update_error.empty()) {
+                ImGui::TextColored(kRed, "%s", app.launcher_update_error.c_str());
+            }
+        }
+        ImGui::EndChild();
+        ImGui::Spacing();
+    }
+
     // -- the account card ------------------------------------------------
     const xlive::Identity id = app.client->identity();
     ImGui::BeginChild("account", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
