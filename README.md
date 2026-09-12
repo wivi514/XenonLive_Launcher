@@ -97,8 +97,10 @@ online co-op (Case West), messages, and the in-game overlay.
 
 Press **Shift+Tab** (or **Back+Start** on a pad) while playing: an overlay
 opens over the game with your friends, invitations, messages and
-achievements. Notifications show over the game even while the overlay is
-closed: a friend coming online, an invitation, a message — and when you
+achievements, and a box to add a friend by gamertag. Notifications show
+over the game even while the overlay is closed (the *Notifications*
+switch in the overlay's header turns them off; invitations and messages
+then wait in the panel with a count on their tab): a friend coming online, an invitation, a message — and when you
 earn an achievement, the popup the console had: its picture, *Achievement
 unlocked*, the name, the score and the description.
 

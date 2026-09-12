@@ -9,6 +9,8 @@
 #include <cstdlib>
 #include <cstring>
 #include <deque>
+#include <filesystem>
+#include <fstream>
 #include <map>
 #include <mutex>
 #include <string>
@@ -182,7 +184,21 @@ struct Overlay::Impl {
     static double Now() {
         return std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
     }
-    void Push(std::string text, double seconds = 5.0) {
+    // Notifications over the game can be switched off from the panel; the
+    // choice is kept in <data dir>/overlay.cfg. Off means nothing pops
+    // while playing — invitations and messages still wait in the panel
+    // with a count on their tab. What a player just did in the panel
+    // ("Invitation sent", "Message not sent") is answered regardless.
+    bool notifications = true;
+    bool settings_loaded = false;
+    std::filesystem::path settings_path;
+    void LoadSettings(Client& c);
+    void SaveSettings();
+    // The add-a-friend box on the Friends tab.
+    char add_gamertag[32] = {};
+
+    void Push(std::string text, double seconds = 5.0, bool even_if_muted = false) {
+        if (!notifications && !even_if_muted) return;
         toasts.push_back({std::move(text), Now() + seconds});
         while (toasts.size() > 5) toasts.erase(toasts.begin());
     }
@@ -625,8 +641,10 @@ void Overlay::Impl::DrainEvents(Client& c) {
                 }
                 t.text = "Achievement unlocked: " + t.name;
                 t.expires_at = Now() + 9.0;
-                toasts.push_back(std::move(t));
-                while (toasts.size() > 5) toasts.erase(toasts.begin());
+                if (notifications) {
+                    toasts.push_back(std::move(t));
+                    while (toasts.size() > 5) toasts.erase(toasts.begin());
+                }
                 break;
             }
             case xlive::EventKind::InviteReceived:
@@ -692,7 +710,7 @@ void Overlay::Impl::PollTickets(Client& c) {
             ++i;
             continue;
         }
-        if (status == Client::OpStatus::Failed) Push(pending[i].what + " failed: " + result.error);
+        if (status == Client::OpStatus::Failed) Push(pending[i].what + " failed: " + result.error, 5.0, true);
         pending.erase(pending.begin() + long(i));
     }
     if (presence_ticket) {
@@ -742,7 +760,7 @@ void Overlay::Impl::PollTickets(Client& c) {
                 }
                 if (!inbox_ticket) inbox_ticket = c.LoadConversations();
             } else {
-                Push("Message not sent: " + result.error);
+                Push("Message not sent: " + result.error, 5.0, true);
             }
         }
     }
@@ -805,6 +823,32 @@ void Overlay::Impl::PollTickets(Client& c) {
         }
         it = image_tickets.erase(it);
     }
+}
+
+// -- settings -----------------------------------------------------------------
+
+void Overlay::Impl::LoadSettings(Client& c) {
+    settings_loaded = true;
+    // One line per setting, "name=value": nothing to parse but a split.
+    settings_path = std::filesystem::path(c.data_dir()) / "overlay.cfg";
+    std::ifstream in(settings_path);
+    std::string line;
+    while (std::getline(in, line)) {
+        const auto eq = line.find('=');
+        if (eq == std::string::npos) continue;
+        const std::string key = line.substr(0, eq), value = line.substr(eq + 1);
+        if (key == "notifications") notifications = value != "0";
+    }
+    // XLIVE_OVERLAY_NOTIFICATIONS=0 overrides the file for one run.
+    if (const char* env = std::getenv("XLIVE_OVERLAY_NOTIFICATIONS")) notifications = std::string(env) != "0";
+}
+
+void Overlay::Impl::SaveSettings() {
+    if (settings_path.empty()) return;
+    std::error_code ec;
+    std::filesystem::create_directories(settings_path.parent_path(), ec);
+    std::ofstream out(settings_path, std::ios::trunc);
+    if (out) out << "notifications=" << (notifications ? 1 : 0) << "\n";
 }
 
 // -- drawing ------------------------------------------------------------------
@@ -908,8 +952,16 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
     ImGui::SameLine();
     ImGui::TextColored(c.online() ? kGreen : kAmber, c.online() ? "online" : "offline");
     const char* hint = "Shift+Tab or Back+Start closes";
-    ImGui::SameLine(size.x - ImGui::CalcTextSize(hint).x - ImGui::GetStyle().WindowPadding.x);
+    const float toggle_w = ImGui::CalcTextSize("Notifications").x + ImGui::GetFrameHeight() + 8.0f * scale;
+    ImGui::SameLine(size.x - ImGui::CalcTextSize(hint).x - toggle_w - 20.0f * scale -
+                    ImGui::GetStyle().WindowPadding.x);
     ImGui::TextDisabled("%s", hint);
+    ImGui::SameLine(size.x - toggle_w - ImGui::GetStyle().WindowPadding.x);
+    if (ImGui::Checkbox("Notifications", &notifications)) SaveSettings();
+    if (ImGui::IsItemHovered()) {
+        ImGui::SetTooltip("Off: nothing pops up over the game. Invitations and messages still\n"
+                          "wait here, with a count on their tab.");
+    }
     ImGui::Separator();
 
     if (ImGui::BeginTabBar("tabs")) {
@@ -926,6 +978,19 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
             if (ImGui::SmallButton("Refresh")) {
                 Issue(c.RefreshFriends(), "Refresh");
                 if (!presence_ticket) presence_ticket = c.LoadMyPresence();
+            }
+            // Add by gamertag, as on the launcher's Friends tab. Asking
+            // someone who has asked you IS accepting, so one box does both.
+            ImGui::SetNextItemWidth(220.0f * scale);
+            const bool add_enter = ImGui::InputTextWithHint("##add", "gamertag", add_gamertag,
+                                                            sizeof(add_gamertag),
+                                                            ImGuiInputTextFlags_EnterReturnsTrue);
+            ImGui::SameLine();
+            if ((ImGui::SmallButton("Add friend") || add_enter) && add_gamertag[0] != '\0') {
+                const std::string tag = add_gamertag;
+                Issue(c.AddFriendByGamertag(tag), "Add " + tag);
+                Push("Friend request sent to " + tag, 5.0, true);
+                std::memset(add_gamertag, 0, sizeof(add_gamertag));
             }
             ImGui::BeginChild("friends", ImVec2(0, 0), ImGuiChildFlags_None);
             const auto list = c.friends();
@@ -946,7 +1011,7 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                     ImGui::BeginDisabled(!can_invite || !f.presence.online());
                     if (ImGui::SmallButton("Invite")) {
                         Issue(c.SendInvite(mine.session_id, f.xuid), "Invite " + f.gamertag);
-                        Push("Invitation sent to " + f.gamertag);
+                        Push("Invitation sent to " + f.gamertag, 5.0, true);
                     }
                     ImGui::EndDisabled();
                     ImGui::EndChild();
@@ -970,7 +1035,7 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                 ImGui::PopID();
                 ImGui::PopID();
             }
-            if (!any) ImGui::TextDisabled("No friends yet. Add them from the launcher.");
+            if (!any) ImGui::TextDisabled("No friends yet. Type a gamertag above to add one.");
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -1271,6 +1336,7 @@ bool Overlay::Render(const VulkanHandles& handles, VkCommandBuffer cmd, VkImage 
     // the panel to open — but ImGui itself is only touched on a frame that
     // draws something. The common frame, closed with nothing to say, costs
     // a few atomic loads and an empty queue swap.
+    if (!s.settings_loaded) s.LoadSettings(*client);
     s.DrainEvents(*client);
     s.PollTickets(*client);
     {
