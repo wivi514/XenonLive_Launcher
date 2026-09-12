@@ -49,6 +49,9 @@ const ImVec4& kDim = xlive::theme::kMuted;
 struct Toast {
     std::string text;
     double expires_at = 0;
+    // A port's own notice (Overlay::Notify) carries a tag so the port can
+    // take it down early (Dismiss) — a co-op call that was answered, say.
+    std::string tag;
     // An unlock is the one toast with a picture: the tile, the name, the
     // score and the description, the way the console's popup had them.
     bool achievement = false;
@@ -118,6 +121,11 @@ struct Overlay::Impl {
     std::atomic<int> window_w{0}, window_h{0};
 
     std::mutex events_mutex;
+    // Notices from the port (Overlay::Notify / Dismiss), any thread; drained
+    // into `toasts` on the render thread beside the events.
+    struct Notice { std::string text; double seconds; std::string tag; bool dismiss; };
+    std::deque<Notice> notices;
+    std::mutex notices_mutex;
     std::deque<xlive::Event> events;
     std::mutex input_mutex;
     std::vector<SDL_Event> input;
@@ -242,6 +250,16 @@ void Overlay::OnEvent(const xlive::Event& event) {
     std::lock_guard<std::mutex> lock(impl_->events_mutex);
     impl_->events.push_back(event);
     while (impl_->events.size() > 64) impl_->events.pop_front();
+}
+
+void Overlay::Notify(std::string text, double seconds, std::string tag) {
+    std::lock_guard<std::mutex> lock(impl_->notices_mutex);
+    impl_->notices.push_back({std::move(text), seconds, std::move(tag), false});
+    while (impl_->notices.size() > 32) impl_->notices.pop_front();
+}
+void Overlay::Dismiss(const std::string& tag) {
+    std::lock_guard<std::mutex> lock(impl_->notices_mutex);
+    impl_->notices.push_back({{}, 0.0, tag, true});
 }
 
 bool Overlay::open() const { return impl_->open.load(); }
@@ -1374,6 +1392,28 @@ bool Overlay::Render(const VulkanHandles& handles, VkCommandBuffer cmd, VkImage 
     if (!s.settings_loaded) s.LoadSettings(*client);
     s.DrainEvents(*client);
     s.PollTickets(*client);
+    {
+        // The port's own notices: shown whatever the notifications setting
+        // says (they are the game asking the player something, not social
+        // chatter), replaced in place when the tag is already up, taken down
+        // by a Dismiss of the tag.
+        std::deque<Impl::Notice> batch;
+        {
+            std::lock_guard<std::mutex> lock(s.notices_mutex);
+            batch.swap(s.notices);
+        }
+        for (Impl::Notice& n : batch) {
+            if (!n.tag.empty())
+                std::erase_if(s.toasts, [&](const Toast& t) { return t.tag == n.tag; });
+            if (n.dismiss) continue;
+            Toast t;
+            t.text = std::move(n.text);
+            t.tag = std::move(n.tag);
+            t.expires_at = Impl::Now() + n.seconds;
+            s.toasts.push_back(std::move(t));
+            while (s.toasts.size() > 5) s.toasts.erase(s.toasts.begin());
+        }
+    }
     {
         const double now = Impl::Now();
         std::erase_if(s.toasts, [&](const Toast& t) { return t.expires_at <= now; });

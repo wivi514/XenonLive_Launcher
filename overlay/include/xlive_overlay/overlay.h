@@ -18,6 +18,7 @@
 #pragma once
 
 #include <cstdint>
+#include <string>
 
 #include <vulkan/vulkan.h>
 
@@ -54,6 +55,12 @@ public:
     void SetClient(xlive::Client* client, uint32_t title_id);
     // The client's event callback forwards here. Thread-safe.
     void OnEvent(const xlive::Event& event);
+    // A notice of the port's own — a co-op call ringing, say — as a toast for
+    // `seconds`, shown whether or not the overlay is open and whatever the
+    // notifications setting says. A non-empty `tag` replaces any toast with
+    // the same tag and lets Dismiss take it down early. Thread-safe.
+    void Notify(std::string text, double seconds, std::string tag = {});
+    void Dismiss(const std::string& tag);
 
     // -- main thread ------------------------------------------------------
     // Every SDL event, whether or not the overlay is open; it watches for
