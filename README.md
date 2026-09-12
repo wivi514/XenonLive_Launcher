@@ -95,9 +95,14 @@ online co-op (Case West), messages, and the in-game overlay.
 
 ## In the game
 
-Press **Shift+Tab** (or **Back+Start** on a pad) while playing: an overlay
-opens over the game with your friends, invitations, messages and
-achievements, and a box to add a friend by gamertag. Notifications show
+Press **Shift+Tab** — or **View+Menu** together on a controller (the two
+small buttons in the middle; Back+Start on a 360 pad), or the Guide button
+— while playing: an overlay opens over the game with your friends,
+invitations, messages and achievements, and a box to add a friend by
+gamertag. It is built for the pad: **LB/RB** switch tabs, the stick or
+d-pad moves, **A** picks, the right stick scrolls, **B** closes. (Typing a
+gamertag or a message needs a keyboard, or the Steam Deck's on-screen
+one.) Notifications show
 over the game even while the overlay is closed (the *Notifications*
 switch in the overlay's header turns them off; invitations and messages
 then wait in the panel with a count on their tab): a friend coming online, an invitation, a message — and when you

@@ -196,6 +196,15 @@ struct Overlay::Impl {
     void SaveSettings();
     // The add-a-friend box on the Friends tab.
     char add_gamertag[32] = {};
+    // The tab bar, as a number, so a shoulder button can step it: 0
+    // Friends, 1 Invites, 2 Messages, 3 Achievements. requested_tab is
+    // applied on the next BeginTabItem of that tab and cleared.
+    int current_tab = 0;
+    int requested_tab = -1;
+    static constexpr int kTabs = 4;
+    // Opened with the pad: the nav cursor is shown at once, so the first
+    // thing on screen is already the thing a press would hit.
+    std::atomic<bool> opened_by_pad{false};
 
     void Push(std::string text, double seconds = 5.0, bool even_if_muted = false) {
         if (!notifications && !even_if_muted) return;
@@ -258,11 +267,13 @@ bool Overlay::QueueSdlEvent(const SDL_Event& event) {
         if (impl_->pad_back && impl_->pad_start && !impl_->chord_fired) {
             impl_->chord_fired = true;
             Toggle();
+            impl_->opened_by_pad.store(impl_->open.load());
             return true;
         }
         if (!impl_->pad_back && !impl_->pad_start) impl_->chord_fired = false;
         if (event.cbutton.button == SDL_CONTROLLER_BUTTON_GUIDE && down) {
             Toggle();
+            impl_->opened_by_pad.store(impl_->open.load());
             return true;
         }
     }
@@ -599,6 +610,11 @@ void Overlay::Impl::DrainInput(uint32_t width, uint32_t height) {
                     analog(ImGuiKey_GamepadLStickLeft, ImGuiKey_GamepadLStickRight);
                 } else if (e.caxis.axis == SDL_CONTROLLER_AXIS_LEFTY) {
                     analog(ImGuiKey_GamepadLStickUp, ImGuiKey_GamepadLStickDown);
+                } else if (e.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTX) {
+                    // The right stick scrolls a list, as in ImGui's own nav.
+                    analog(ImGuiKey_GamepadRStickLeft, ImGuiKey_GamepadRStickRight);
+                } else if (e.caxis.axis == SDL_CONTROLLER_AXIS_RIGHTY) {
+                    analog(ImGuiKey_GamepadRStickUp, ImGuiKey_GamepadRStickDown);
                 }
                 break;
             }
@@ -951,7 +967,7 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
     ImGui::PopFont();
     ImGui::SameLine();
     ImGui::TextColored(c.online() ? kGreen : kAmber, c.online() ? "online" : "offline");
-    const char* hint = "Shift+Tab or Back+Start closes";
+    const char* hint = "Shift+Tab / View+Menu closes  -  LB RB tabs, B back";
     const float toggle_w = ImGui::CalcTextSize("Notifications").x + ImGui::GetFrameHeight() + 8.0f * scale;
     ImGui::SameLine(size.x - ImGui::CalcTextSize(hint).x - toggle_w - 20.0f * scale -
                     ImGui::GetStyle().WindowPadding.x);
@@ -964,8 +980,32 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
     }
     ImGui::Separator();
 
+    // The pad: LB/RB step the tabs, B closes (unless a text box has the
+    // focus, where B is its cancel). XLIVE_OVERLAY_TAB=friends|invites|
+    // messages|achievements picks one on the first frame, for a photograph.
+    {
+        static const char* wanted_tab = std::getenv("XLIVE_OVERLAY_TAB");
+        if (wanted_tab) {
+            const char* names[kTabs] = {"friends", "invites", "messages", "achievements"};
+            for (int i = 0; i < kTabs; ++i) {
+                if (std::strcmp(wanted_tab, names[i]) == 0) requested_tab = i;
+            }
+            wanted_tab = nullptr;
+        }
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadL1, false)) requested_tab = (current_tab + kTabs - 1) % kTabs;
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadR1, false)) requested_tab = (current_tab + 1) % kTabs;
+        if (ImGui::IsKeyPressed(ImGuiKey_GamepadFaceRight, false) && !ImGui::GetIO().WantTextInput) {
+            open.store(false);
+        }
+        if (opened_by_pad.exchange(false)) ImGui::SetNavCursorVisible(true);
+    }
+    const auto tab_flags = [&](int index) {
+        return requested_tab == index ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
+    };
+
     if (ImGui::BeginTabBar("tabs")) {
-        if (ImGui::BeginTabItem("Friends")) {
+        if (ImGui::BeginTabItem("Friends", nullptr, tab_flags(0))) {
+            current_tab = 0;
             const bool can_invite = mine_loaded && mine.session_id != 0;
             if (presence_ticket) {
                 ImGui::TextDisabled("reading your session...");
@@ -1046,7 +1086,8 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
         // jumps back to the first one.
         const std::string invites_label =
             (invites.empty() ? "Invites" : "Invites (" + std::to_string(invites.size()) + ")") + "###invites";
-        if (ImGui::BeginTabItem(invites_label.c_str())) {
+        if (ImGui::BeginTabItem(invites_label.c_str(), nullptr, tab_flags(1))) {
+            current_tab = 1;
             ImGui::SameLine(size.x - 110.0f * scale);
             ImGui::BeginDisabled(refresh_ticket != 0);
             if (ImGui::SmallButton("Refresh")) refresh_ticket = c.RefreshInvites();
@@ -1073,27 +1114,21 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
-        // XLIVE_OVERLAY_TAB=achievements|invites|messages selects a tab on the first
-        // frame, for a headless photograph; nobody at a keyboard needs it.
-        static const char* wanted_tab = std::getenv("XLIVE_OVERLAY_TAB");
-        static bool tab_selected = false;
-        const auto select = [&](const char* name) {
-            const bool pick = wanted_tab && !tab_selected && std::strcmp(wanted_tab, name) == 0;
-            return pick ? ImGuiTabItemFlags_SetSelected : ImGuiTabItemFlags_None;
-        };
         int unread_total = 0;
         for (const auto& [xuid, n] : unread) unread_total += n;
         const std::string messages_label =
             (unread_total ? "Messages (" + std::to_string(unread_total) + ")" : "Messages") + "###messages";
-        if (ImGui::BeginTabItem(messages_label.c_str(), nullptr, select("messages"))) {
+        if (ImGui::BeginTabItem(messages_label.c_str(), nullptr, tab_flags(2))) {
+            current_tab = 2;
             DrawMessages(c, size.x);
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Achievements", nullptr, select("achievements"))) {
+        if (ImGui::BeginTabItem("Achievements", nullptr, tab_flags(3))) {
+            current_tab = 3;
             DrawAchievements(c, size.x);
             ImGui::EndTabItem();
         }
-        tab_selected = true;
+        requested_tab = -1;
         ImGui::EndTabBar();
     }
     ImGui::End();
