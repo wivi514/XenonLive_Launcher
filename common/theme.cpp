@@ -57,6 +57,7 @@ void Apply(ImGuiStyle& style, float scale, float bg_alpha) {
     c[ImGuiCol_ScrollbarGrabHovered] = kBorder;
     c[ImGuiCol_ScrollbarGrabActive] = kGreen;
     c[ImGuiCol_CheckMark] = kLime;
+    c[ImGuiCol_TextLink] = kLime;
     c[ImGuiCol_SliderGrab] = kGreen;
     c[ImGuiCol_SliderGrabActive] = kGreenHi;
     c[ImGuiCol_Button] = kGreen;

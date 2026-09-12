@@ -87,12 +87,27 @@ public:
     void ForgetAccount(uint64_t xuid);
 
     struct SignInState {
+        // Which form the panel shows. Register asks for the optional email;
+        // Forgot asks for the gamertag, then the mailed code and a new
+        // password.
+        enum class Mode { SignIn, Register, Forgot };
+        Mode mode = Mode::SignIn;
         char server[256] = {};
         char gamertag[32] = {};
         char password[128] = {};
+        // Register only. For password recovery and nothing else; empty
+        // means the account cannot be recovered, and the form says so.
+        char email[256] = {};
+        // Forgot only: the eight letters from the mail.
+        char code[32] = {};
         xlive::Client::Ticket ticket = 0;
-        bool registering = false;
+        // What the ticket is doing, for the status line.
+        enum class Pending { SignIn, Register, Forgot, Reset };
+        Pending pending = Pending::SignIn;
         std::string error;
+        // Forgot: where the code went, masked ("f***@example.org"), once
+        // the server has sent it. Non-empty switches the form to the code.
+        std::string sent_to;
     } signin;
 
     struct FriendsState {

@@ -31,6 +31,9 @@ namespace {
 // XENONLIVE_PROFILE=<gamertag> opens that friend's profile page and presses
 // Compare on the first title; XENONLIVE_MESSAGE=<gamertag> opens the
 // conversation with that friend, and XENONLIVE_SAY=<text> then sends that.
+// XENONLIVE_SIGNIN=register|forgot opens that form; XENONLIVE_FORGOT=<gamertag>
+// asks for a recovery code; XENONLIVE_RECOVER=<gamertag>:<code>:<password>
+// sets a new password with a code already mailed.
 // None does anything unless set.
 void SaveScreenshot(SDL_Renderer* renderer, const char* path) {
     int w = 0, h = 0;
@@ -121,6 +124,12 @@ int main(int, char**) {
     bool profile_compare = false;
     const char* message_tag = std::getenv("XENONLIVE_MESSAGE");
     const char* say = std::getenv("XENONLIVE_SAY");
+    if (const char* form = std::getenv("XENONLIVE_SIGNIN")) {
+        if (std::string(form) == "register") app.signin.mode = launcher::App::SignInState::Mode::Register;
+        if (std::string(form) == "forgot") app.signin.mode = launcher::App::SignInState::Mode::Forgot;
+    }
+    const char* forgot_tag = std::getenv("XENONLIVE_FORGOT");
+    const char* recover = std::getenv("XENONLIVE_RECOVER");
 
     ImGui_ImplSDL2_InitForSDLRenderer(window, renderer);
     ImGui_ImplSDLRenderer2_Init(renderer);
@@ -154,6 +163,33 @@ int main(int, char**) {
                 std::fprintf(stderr, "[launcher] XENONLIVE_SWITCH: %s\n", switch_error.c_str());
             }
             switch_xuid = nullptr;
+        }
+        if (forgot_tag && app.client) {
+            app.signin.mode = launcher::App::SignInState::Mode::Forgot;
+            std::snprintf(app.signin.gamertag, sizeof(app.signin.gamertag), "%s", forgot_tag);
+            app.signin.pending = launcher::App::SignInState::Pending::Forgot;
+            app.signin.ticket = app.client->ForgotPassword(forgot_tag);
+            forgot_tag = nullptr;
+        }
+        if (recover && app.client) {
+            const std::string spec(recover);
+            const auto a = spec.find(':');
+            const auto b = a == std::string::npos ? a : spec.find(':', a + 1);
+            if (b != std::string::npos) {
+                app.signin.mode = launcher::App::SignInState::Mode::Forgot;
+                app.signin.sent_to = "your email";
+                std::snprintf(app.signin.gamertag, sizeof(app.signin.gamertag), "%s",
+                              spec.substr(0, a).c_str());
+                std::snprintf(app.signin.code, sizeof(app.signin.code), "%s",
+                              spec.substr(a + 1, b - a - 1).c_str());
+                app.signin.pending = launcher::App::SignInState::Pending::Reset;
+                app.signin.ticket = app.client->ResetPassword(spec.substr(0, a),
+                                                              spec.substr(a + 1, b - a - 1),
+                                                              spec.substr(b + 1));
+            } else {
+                std::fprintf(stderr, "[launcher] XENONLIVE_RECOVER wants gamertag:code:password\n");
+            }
+            recover = nullptr;
         }
         if (install_key && app.signed_in()) {
             if (const launcher::CatalogGame* game = launcher::CatalogByKey(install_key)) {

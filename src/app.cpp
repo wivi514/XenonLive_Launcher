@@ -363,12 +363,21 @@ void App::PollPending() {
         const auto status = client->Poll(signin.ticket, result);
         if (status != xlive::Client::OpStatus::Pending) {
             signin.ticket = 0;
-            if (status == xlive::Client::OpStatus::Succeeded) {
-                signin.error.clear();
-                std::memset(signin.password, 0, sizeof(signin.password));
-                adding_account = false;
-            } else {
+            if (status != xlive::Client::OpStatus::Succeeded) {
                 signin.error = result.error.empty() ? "unknown" : result.error;
+            } else if (signin.pending == SignInState::Pending::Forgot) {
+                // The mail is out; the form now wants the code.
+                signin.error.clear();
+                signin.sent_to = result.detail.empty() ? "your email" : result.detail;
+            } else {
+                // Signed in, registered, or reset (which signs in too).
+                signin.error.clear();
+                signin.mode = SignInState::Mode::SignIn;
+                signin.sent_to.clear();
+                std::memset(signin.password, 0, sizeof(signin.password));
+                std::memset(signin.email, 0, sizeof(signin.email));
+                std::memset(signin.code, 0, sizeof(signin.code));
+                adding_account = false;
             }
         }
     }
