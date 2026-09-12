@@ -882,6 +882,7 @@ void App::DrawRail() {
     if (inbox > 0) std::snprintf(badge, sizeof(badge), "%zu", inbox);
     blade("Invites", Tab::Invites, badge);
     blade("Achievements", Tab::Achievements);
+    blade("Support", Tab::Support);
 
     // The gamercard, at the bottom.
     const float card_h = fonts.heading->FontSize + ImGui::GetTextLineHeight() * 2.0f + 26.0f;
@@ -907,6 +908,7 @@ void App::DrawContent() {
         case Tab::Messages:     DrawMessages(*this); break;
         case Tab::Invites:      DrawInvites(*this); break;
         case Tab::Achievements: DrawAchievements(*this); break;
+        case Tab::Support:      DrawSupport(*this); break;
         case Tab::Profile:      DrawProfile(*this); break;
     }
     ImGui::EndChild();

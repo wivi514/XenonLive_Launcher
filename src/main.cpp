@@ -22,7 +22,7 @@ namespace {
 
 // Two development hooks, for driving the launcher from a shell with no one
 // at the screen: XENONLIVE_SCREENSHOT=file.bmp saves the window after two
-// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements
+// seconds and keeps going; XENONLIVE_TAB=home|friends|messages|invites|achievements|support
 // picks the starting tab; XENONLIVE_PLAY=1 presses Play on the first title
 // once signed in; XENONLIVE_ACCEPT=1 presses Accept on the first invitation
 // in the inbox; XENONLIVE_INSTALL=<catalog key> presses Install on that game;
@@ -55,6 +55,7 @@ launcher::Tab StartingTab() {
     if (name == "messages") return launcher::Tab::Messages;
     if (name == "invites") return launcher::Tab::Invites;
     if (name == "achievements") return launcher::Tab::Achievements;
+    if (name == "support") return launcher::Tab::Support;
     return launcher::Tab::Home;
 }
 

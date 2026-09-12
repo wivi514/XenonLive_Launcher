@@ -91,6 +91,9 @@ A single window with a rail of tabs:
   ones read "Secret achievement" with no art until unlocked. The art is the
   SPA's own, served by the server and cached under `launcher/images/` since
   it never changes.
+- **Support** — a word about who makes this, a link to GitHub Sponsors,
+  and the ports' repositories for bug reports and pull requests. The links
+  are one table in `screens/support.cpp`; a new one is one line.
 - **Toasts** — bottom right: a friend coming online or starting a game, a
   request, an invitation (with an *Accept* button), the connection changing.
 
@@ -243,7 +246,7 @@ screen (the acceptance run in `PLAN.md` uses them):
 | Variable | Effect |
 |---|---|
 | `XENONLIVE_SCREENSHOT=file.bmp` | saves the window after two seconds and keeps going |
-| `XENONLIVE_TAB=home\|friends\|messages\|invites\|achievements` | the starting tab |
+| `XENONLIVE_TAB=home\|friends\|messages\|invites\|achievements\|support` | the starting tab |
 | `XENONLIVE_PLAY=1` | presses Play on the first title once signed in |
 | `XENONLIVE_ACCEPT=1` | presses Accept on the first invitation in the inbox |
 | `XENONLIVE_INSTALL=case_west` | presses Install on that game |

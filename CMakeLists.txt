@@ -80,6 +80,7 @@ add_executable(xenonlive_launcher
     src/screens/invites.cpp
     src/screens/achievements.cpp
     src/screens/profile.cpp
+    src/screens/support.cpp
 )
 target_include_directories(xenonlive_launcher PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src

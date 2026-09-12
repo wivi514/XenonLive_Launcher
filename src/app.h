@@ -28,7 +28,7 @@ namespace launcher {
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
-enum class Tab { Home, Friends, Messages, Invites, Achievements, Profile };
+enum class Tab { Home, Friends, Messages, Invites, Achievements, Support, Profile };
 
 // A ticket the UI issued for a fire-and-forget action. Every one is collected
 // — the library holds a result until someone does — and a failure is toasted
