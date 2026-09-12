@@ -17,6 +17,7 @@
 #include <xlive/client.h>
 
 #include "imgui.h"
+#include "theme.h"
 #include "imgui_impl_vulkan.h"
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -37,9 +38,11 @@ namespace {
 
 using Client = xlive::Client;
 
-const ImVec4 kGreen(0.45f, 0.85f, 0.45f, 1.0f);
-const ImVec4 kAmber(0.9f, 0.7f, 0.35f, 1.0f);
-const ImVec4 kDim(0.55f, 0.55f, 0.55f, 1.0f);
+// The launcher's palette, so the overlay looks like the thing that started
+// the game.
+const ImVec4& kGreen = xlive::theme::kLime;
+const ImVec4& kAmber = xlive::theme::kAmber;
+const ImVec4& kDim = xlive::theme::kMuted;
 
 struct Toast {
     std::string text;
@@ -120,6 +123,7 @@ struct Overlay::Impl {
     std::map<VkImage, VkImageView> views;
     std::chrono::steady_clock::time_point last_frame{};
     float scale = 1.0f;
+    xlive::theme::Fonts fonts;
 
     // UI state.
     std::vector<Toast> toasts;
@@ -261,28 +265,13 @@ void Overlay::Impl::Init(const VulkanHandles& h) {
     io.BackendFlags |= ImGuiBackendFlags_HasGamepad;
     io.BackendPlatformName = "xlive_overlay";
 
-    ImGuiStyle& style = ImGui::GetStyle();
-    ImGui::StyleColorsDark(&style);
-    style.WindowRounding = 6.0f;
-    style.FrameRounding = 3.0f;
-    style.WindowPadding = ImVec2(16.0f, 14.0f);
-    style.FramePadding = ImVec2(8.0f, 5.0f);
-    style.ItemSpacing = ImVec2(8.0f, 6.0f);
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.08f, 0.09f, 0.10f, 0.94f);
-    style.Colors[ImGuiCol_ChildBg] = ImVec4(0.12f, 0.13f, 0.14f, 0.9f);
-    style.Colors[ImGuiCol_Border] = ImVec4(0.25f, 0.27f, 0.29f, 1.0f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.18f, 0.36f, 0.22f, 1.0f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.24f, 0.48f, 0.29f, 1.0f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.30f, 0.60f, 0.36f, 1.0f);
-    style.Colors[ImGuiCol_Tab] = ImVec4(0.14f, 0.16f, 0.18f, 1.0f);
-    style.Colors[ImGuiCol_TabSelected] = ImVec4(0.18f, 0.36f, 0.22f, 1.0f);
-    style.Colors[ImGuiCol_TabHovered] = ImVec4(0.24f, 0.48f, 0.29f, 1.0f);
-    style.Colors[ImGuiCol_NavCursor] = ImVec4(0.45f, 0.85f, 0.45f, 0.8f);
-
-    // The built-in font. The backend uploads its atlas on the first
+    // The launcher's theme and font, translucent enough to keep the game in
+    // view. The font is set for 720p and FontGlobalScale takes it up from
+    // there; the backend uploads the atlas on the first
     // ImGui_ImplVulkan_NewFrame, which is the first frame with something to
     // draw — a queue submit and a wait, once, when the first toast appears.
-    io.Fonts->AddFontDefault();
+    xlive::theme::Apply(ImGui::GetStyle(), 1.0f, 0.94f);
+    fonts = xlive::theme::LoadFonts(io, 20.0f);
 
     ImGui_ImplVulkan_InitInfo info{};
     info.ApiVersion = h.api_version;
@@ -722,6 +711,11 @@ void Overlay::Impl::DrawToasts(uint32_t width, uint32_t height) {
                              ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoSavedSettings |
                              ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav |
                              ImGuiWindowFlags_NoInputs)) {
+            const ImVec2 min = ImGui::GetWindowPos();
+            const ImVec2 max(min.x + ImGui::GetWindowSize().x, min.y + ImGui::GetWindowSize().y);
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                min, ImVec2(min.x + 5.0f * scale, max.y), ImGui::GetColorU32(xlive::theme::kLime),
+                ImGui::GetStyle().WindowRounding, ImDrawFlags_RoundCornersLeft);
             ImGui::PushTextWrapPos(440.0f * scale);
             ImGui::TextUnformatted(toasts[i].text.c_str());
             ImGui::PopTextWrapPos();
@@ -747,7 +741,15 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoTitleBar);
 
     const xlive::Identity id = c.identity();
+    ImGui::PushFont(fonts.title);
+    ImGui::TextColored(xlive::theme::kLime, "Xenon");
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::TextUnformatted("Live");
+    ImGui::PopFont();
+    ImGui::SameLine(0.0f, 16.0f * scale);
+    ImGui::PushFont(fonts.heading);
     ImGui::Text("%s", id.gamertag.c_str());
+    ImGui::PopFont();
     ImGui::SameLine();
     ImGui::TextColored(c.online() ? kGreen : kAmber, c.online() ? "online" : "offline");
     const char* hint = "Shift+Tab or Back+Start closes";
@@ -932,7 +934,7 @@ void Overlay::Impl::DrawAchievements(Client& c, float width) {
         if (unlocked) {
             ImGui::TextUnformatted(a.unlocked_description.empty() ? a.locked_description.c_str()
                                                                   : a.unlocked_description.c_str());
-            if (!a.unlocked_at.empty()) ImGui::TextDisabled("unlocked %s", a.unlocked_at.c_str());
+            if (!a.unlocked_at.empty()) ImGui::TextDisabled("unlocked %s", a.unlocked_at.substr(0, 10).c_str());
         } else if (secret) {
             ImGui::TextDisabled("Keep playing to reveal it.");
         } else {

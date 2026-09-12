@@ -39,14 +39,23 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
     ImGui::BeginChild("row", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
 
     const bool online = f.presence.online();
-    ImGui::TextColored(online ? ImVec4(0.45f, 0.85f, 0.45f, 1.0f) : ImVec4(0.5f, 0.5f, 0.5f, 1.0f),
-                       "%s", online ? "*" : "o");
-    ImGui::SameLine();
-    // The name is the way in to their profile page.
+    // The status dot, then the name in the heading face: the name is the
+    // way in to their profile page.
+    {
+        const ImVec2 pos = ImGui::GetCursorScreenPos();
+        const float h = app.fonts.heading->FontSize;
+        ImGui::GetWindowDrawList()->AddCircleFilled(
+            ImVec2(pos.x + 5.0f, pos.y + h * 0.55f), 4.5f,
+            ImGui::GetColorU32(online ? xlive::theme::kLime : xlive::theme::kMuted));
+        ImGui::Dummy(ImVec2(12.0f, h));
+        ImGui::SameLine();
+    }
+    ImGui::PushFont(app.fonts.heading);
     if (ImGui::Selectable(f.gamertag.c_str(), false, ImGuiSelectableFlags_None,
                           ImVec2(ImGui::CalcTextSize(f.gamertag.c_str()).x + 4.0f, 0.0f))) {
         app.OpenProfile(f.xuid, f.gamertag);
     }
+    ImGui::PopFont();
     if (ImGui::IsItemHovered()) ImGui::SetTooltip("View profile");
     ImGui::SameLine();
     ImGui::TextDisabled("%u G", f.gamerscore);
@@ -156,11 +165,11 @@ void DrawFriends(App& app) {
     }
 
     if (!received.empty()) {
-        ImGui::SeparatorText("Requests");
+        xlive::theme::Section("Requests");
         for (const Friend* f : received) DrawFriendRow(app, *f, can_invite);
     }
 
-    ImGui::SeparatorText("Friends");
+    xlive::theme::Section("Friends");
     if (friends.empty()) {
         ImGui::TextDisabled(list.empty() && !app.client->gateway_connected()
                                 ? "No friends yet, and no connection to the server."
@@ -171,7 +180,7 @@ void DrawFriends(App& app) {
     for (const Friend* f : friends) if (!f->presence.online()) DrawFriendRow(app, *f, can_invite);
 
     if (!sent.empty()) {
-        ImGui::SeparatorText("Sent");
+        xlive::theme::Section("Sent");
         for (const Friend* f : sent) DrawFriendRow(app, *f, can_invite);
     }
 }

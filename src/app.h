@@ -20,6 +20,7 @@
 #include "images.h"
 #include "installer.h"
 #include "launch.h"
+#include "theme.h"
 #include "toasts.h"
 #include "xlive/client.h"
 
@@ -59,6 +60,8 @@ public:
     // Achievement and title tiles, from the server. Opened by main once the
     // renderer exists.
     ImageCache images;
+    // Body, heading and title faces; loaded by main after the config.
+    xlive::theme::Fonts fonts;
     Tab tab = Tab::Home;
 
     // "We know who the player is" — the cached identity counts, so a saved

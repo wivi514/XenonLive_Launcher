@@ -14,46 +14,9 @@
 #include "imgui.h"
 #include "imgui_impl_sdl2.h"
 #include "imgui_impl_sdlrenderer2.h"
+#include "theme.h"
 
 namespace {
-
-void ApplyStyle(ImGuiStyle& style) {
-    ImGui::StyleColorsDark(&style);
-    style.WindowPadding = ImVec2(14.0f, 12.0f);
-    style.FramePadding = ImVec2(8.0f, 5.0f);
-    style.ItemSpacing = ImVec2(8.0f, 6.0f);
-    style.ChildRounding = 4.0f;
-    style.FrameRounding = 3.0f;
-    style.GrabRounding = 3.0f;
-    style.ScrollbarSize = 12.0f;
-    style.Colors[ImGuiCol_WindowBg] = ImVec4(0.09f, 0.10f, 0.11f, 1.0f);
-    style.Colors[ImGuiCol_ChildBg] = ImVec4(0.12f, 0.13f, 0.14f, 1.0f);
-    style.Colors[ImGuiCol_Border] = ImVec4(0.22f, 0.24f, 0.26f, 1.0f);
-    style.Colors[ImGuiCol_Button] = ImVec4(0.18f, 0.36f, 0.22f, 1.0f);
-    style.Colors[ImGuiCol_ButtonHovered] = ImVec4(0.24f, 0.48f, 0.29f, 1.0f);
-    style.Colors[ImGuiCol_ButtonActive] = ImVec4(0.30f, 0.60f, 0.36f, 1.0f);
-    style.Colors[ImGuiCol_FrameBg] = ImVec4(0.16f, 0.17f, 0.19f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgHovered] = ImVec4(0.20f, 0.22f, 0.24f, 1.0f);
-    style.Colors[ImGuiCol_FrameBgActive] = ImVec4(0.24f, 0.26f, 0.28f, 1.0f);
-    style.Colors[ImGuiCol_SeparatorHovered] = style.Colors[ImGuiCol_Separator];
-    style.Colors[ImGuiCol_Header] = ImVec4(0.16f, 0.17f, 0.19f, 1.0f);
-    style.Colors[ImGuiCol_HeaderHovered] = ImVec4(0.20f, 0.22f, 0.24f, 1.0f);
-    style.Colors[ImGuiCol_HeaderActive] = ImVec4(0.24f, 0.26f, 0.28f, 1.0f);
-}
-
-// ImGui's built-in ProggyClean has no accents or CJK. Gamertags are ASCII
-// (server-enforced) and both Dead Rising titles' presence strings are
-// English, so v1 is fine with it; launcher.json's font_path is the hook for
-// a TTF with more.
-void LoadFont(ImGuiIO& io, const launcher::Config& config) {
-    if (!config.font_path.empty()) {
-        ImFont* font = io.Fonts->AddFontFromFileTTF(config.font_path.c_str(), config.font_size);
-        if (font) return;
-        std::fprintf(stderr, "[launcher] could not load font %s; using the built-in one\n",
-                     config.font_path.c_str());
-    }
-    io.Fonts->AddFontDefault();
-}
 
 }  // namespace
 
@@ -129,7 +92,7 @@ int main(int, char**) {
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;  // one fixed layout; nothing to remember
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    ApplyStyle(ImGui::GetStyle());
+    xlive::theme::Apply(ImGui::GetStyle());
 
     launcher::Installer::GlobalInit();
     launcher::App app;
@@ -138,7 +101,7 @@ int main(int, char**) {
         std::fprintf(stderr, "[launcher] %s\n", error.c_str());
         return 1;
     }
-    LoadFont(io, app.config);
+    app.fonts = xlive::theme::LoadFonts(io, app.config.font_size, app.config.font_path.c_str());
     app.images.Open(renderer, launcher::DataDir() / "launcher");
     app.images.set_server(app.config.server);
     app.tab = StartingTab();
@@ -225,7 +188,7 @@ int main(int, char**) {
         ImGui::Render();
 
         SDL_RenderSetScale(renderer, io.DisplayFramebufferScale.x, io.DisplayFramebufferScale.y);
-        SDL_SetRenderDrawColor(renderer, 23, 25, 28, 255);
+        SDL_SetRenderDrawColor(renderer, 19, 21, 23, 255);
         SDL_RenderClear(renderer);
         ImGui_ImplSDLRenderer2_RenderDrawData(ImGui::GetDrawData(), renderer);
         if (screenshot && SDL_GetTicks() >= screenshot_at) {

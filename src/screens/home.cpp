@@ -16,9 +16,10 @@ namespace launcher {
 
 namespace {
 
-const ImVec4 kGreen(0.45f, 0.85f, 0.45f, 1.0f);
-const ImVec4 kAmber(0.9f, 0.7f, 0.35f, 1.0f);
-const ImVec4 kRed(0.9f, 0.4f, 0.4f, 1.0f);
+using xlive::theme::kAmber;
+using xlive::theme::kLime;
+using xlive::theme::kRed;
+const ImVec4& kGreen = kLime;
 
 std::string Megabytes(uint64_t bytes) {
     char buf[32];
@@ -54,7 +55,9 @@ void DrawGame(App& app, const CatalogGame& game) {
         ImGui::SameLine();
     }
     ImGui::BeginGroup();
+    ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", game.name);
+    ImGui::PopFont();
     ImGui::SameLine();
     ImGui::TextDisabled("%s", TitleIdHex(game.title_id).c_str());
 
@@ -161,7 +164,9 @@ void DrawHome(App& app) {
     // -- the account card ------------------------------------------------
     const xlive::Identity id = app.client->identity();
     ImGui::BeginChild("account", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", id.gamertag.c_str());
+    ImGui::PopFont();
     ImGui::SameLine();
     ImGui::TextDisabled("  %u G", id.gamerscore);
     ImGui::TextDisabled("%s", app.client->status().c_str());
@@ -202,7 +207,7 @@ void DrawHome(App& app) {
 
     // -- games ------------------------------------------------------------
     ImGui::Spacing();
-    ImGui::SeparatorText("Games");
+    xlive::theme::Section("Games");
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("Releases are downloaded from GitHub as %s builds (this launcher's own "
                         "kind) and checked against the release's SHA256SUMS. You supply your own "
@@ -222,13 +227,15 @@ void DrawHome(App& app) {
     for (const TitleEntry& entry : app.config.titles) any_custom |= !entry.managed();
     if (!any_custom) return;
     ImGui::Spacing();
-    ImGui::SeparatorText("Builds from launcher.json");
+    xlive::theme::Section("Builds from launcher.json");
     for (int i = 0; i < int(app.config.titles.size()); ++i) {
         const TitleEntry& entry = app.config.titles[size_t(i)];
         if (entry.managed()) continue;
         ImGui::PushID(i);
         ImGui::BeginChild("custom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::PushFont(app.fonts.heading);
         ImGui::Text("%s", entry.name.c_str());
+        ImGui::PopFont();
         ImGui::SameLine();
         ImGui::TextDisabled("%s", TitleIdHex(entry.title_id).c_str());
         ImGui::TextDisabled("%s", entry.exe.c_str());

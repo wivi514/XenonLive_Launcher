@@ -208,12 +208,22 @@ the port's pre-boot settings window on; the launcher adds the XenonLive half
 and invitations). Releases published before the ports' `xlive-integration`
 branch shipped ignore both and simply play offline.
 
-## Font
+## Look and font
 
-ImGui's built-in ProggyClean has no accents or CJK. Gamertags are ASCII
-(server-enforced) and both Dead Rising titles' presence strings are English,
-so v1 is fine with it. `"font_path"` and `"font_size"` in `launcher.json` load
-a TTF instead.
+Dark grey and black with the 360's green: a rail of blades on the left (the
+selected one a green blade with a lime edge, the invite count as a badge),
+the gamercard tile at its foot, lime section headings, and notifications
+with the lime edge the console's own had. `common/theme.{h,cpp}` holds the
+palette, the style and those widgets, and the in-game overlay draws with
+the same file, so a player sees one thing in the launcher and the same thing
+over the game.
+
+The face is **Selawik** (Microsoft, SIL Open Font License), an open font
+with Segoe UI's metrics — what the 360 dashboard was set in — vendored under
+`thirdparty/selawik/` and compiled into the binary as bytes, so nothing is
+looked up at run time. Regular for the body, semibold for headings and the
+wordmark. It covers Latin with accents; `"font_path"` and `"font_size"` in
+`launcher.json` swap in another TTF (for CJK, say).
 
 ## Driving it from a shell
 

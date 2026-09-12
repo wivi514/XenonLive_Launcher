@@ -20,6 +20,9 @@ find_package(Vulkan REQUIRED)
 
 add_library(xlive_overlay STATIC
     src/overlay.cpp
+    # The theme and font shared with the launcher.
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common/theme.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/selawik/selawik_data.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui_draw.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui_tables.cpp
@@ -34,10 +37,11 @@ target_include_directories(xlive_overlay
     PRIVATE ${XLIVE_OVERLAY_IMGUI} ${XLIVE_OVERLAY_IMGUI}/backends
     # stb_image.h, for the achievement tiles.
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/stb
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/selawik
 )
 target_link_libraries(xlive_overlay PUBLIC Vulkan::Vulkan SDL2::SDL2 xlive::client)
 # Warnings for our file; none for ImGui's.
-set_source_files_properties(src/overlay.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wshadow;-Wno-missing-field-initializers;-Wno-unused-function")
+set_source_files_properties(src/overlay.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../common/theme.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wshadow;-Wno-missing-field-initializers;-Wno-unused-function")
 set_source_files_properties(
     ${XLIVE_OVERLAY_IMGUI}/imgui.cpp ${XLIVE_OVERLAY_IMGUI}/imgui_draw.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui_tables.cpp ${XLIVE_OVERLAY_IMGUI}/imgui_widgets.cpp

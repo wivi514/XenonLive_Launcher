@@ -55,7 +55,13 @@ add_library(zstddec STATIC thirdparty/zstd/zstddeclib.c)
 target_include_directories(zstddec PUBLIC thirdparty/zstd)
 target_compile_options(zstddec PRIVATE -w)
 
+# Selawik (SIL OFL), the UI font, as bytes in the binary; and the theme
+# both the launcher and the overlay draw with.
+add_library(selawik STATIC thirdparty/selawik/selawik_data.cpp)
+target_include_directories(selawik PUBLIC thirdparty/selawik)
+
 add_executable(xenonlive_launcher
+    common/theme.cpp
     src/main.cpp
     src/app.cpp
     src/accounts.cpp
@@ -76,6 +82,7 @@ add_executable(xenonlive_launcher
 )
 target_include_directories(xenonlive_launcher PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/src
+    ${CMAKE_CURRENT_SOURCE_DIR}/common
     # libxlive's own JSON parser and path helpers, for launcher.json. They are
     # the library's private headers, reached the way its tests reach them: the
     # launcher is the same project's code and there is no reason to carry a
@@ -98,7 +105,7 @@ target_compile_definitions(xenonlive_launcher PRIVATE
 if(TARGET SDL2::SDL2main)
     target_link_libraries(xenonlive_launcher PRIVATE SDL2::SDL2main)
 endif()
-target_link_libraries(xenonlive_launcher PRIVATE xlive::client imgui miniz zstddec CURL::libcurl SDL2::SDL2)
+target_link_libraries(xenonlive_launcher PRIVATE xlive::client imgui selawik miniz zstddec CURL::libcurl SDL2::SDL2)
 
 # A release bundle carries its own lib/ (SDL2, libstdc++) beside the
 # executable, found through the RPATH rather than a launcher script a player

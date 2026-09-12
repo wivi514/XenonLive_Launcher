@@ -1,6 +1,6 @@
 // A title's achievements: name, the locked or unlocked description, score,
 // unlocked date. Hidden ones are "Secret achievement" until unlocked, which
-// is what the console did. No images in v1: the server does not serve them.
+// is what the console did. The tiles are the SPA's own, via the server.
 #include "app.h"
 #include "imgui.h"
 #include "screens/screens.h"
@@ -42,7 +42,7 @@ void DrawAchievements(App& app) {
         return;
     }
     if (!app.achievements.error.empty()) {
-        ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.0f), "%s", app.achievements.error.c_str());
+        ImGui::TextColored(xlive::theme::kRed, "%s", app.achievements.error.c_str());
         if (app.achievements.error == "no_title") {
             ImGui::TextWrapped("This server has not imported the title. "
                                "tools/spa_import.py in XenonLive does that.");
@@ -59,7 +59,9 @@ void DrawAchievements(App& app) {
         ImGui::SameLine();
     }
     ImGui::BeginGroup();
+    ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", title.name.c_str());
+    ImGui::PopFont();
     ImGui::TextDisabled("%u / %u G, %u of %zu unlocked", title.gamerscore, title.max_gamerscore,
                         unlocked, title.achievements.size());
     ImGui::EndGroup();
@@ -88,7 +90,7 @@ void DrawAchievements(App& app) {
         ImGui::SameLine();
         ImGui::BeginGroup();
         if (a.unlocked) {
-            ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "%s", a.name.c_str());
+            ImGui::TextColored(xlive::theme::kLime, "%s", a.name.c_str());
         } else {
             ImGui::TextDisabled("%s", secret ? "Secret achievement" : a.name.c_str());
         }
@@ -97,7 +99,9 @@ void DrawAchievements(App& app) {
         if (a.unlocked) {
             ImGui::TextWrapped("%s", a.unlocked_description.empty() ? a.locked_description.c_str()
                                                                      : a.unlocked_description.c_str());
-            if (!a.unlocked_at.empty()) ImGui::TextDisabled("unlocked %s", a.unlocked_at.c_str());
+            if (!a.unlocked_at.empty()) {
+                ImGui::TextDisabled("unlocked %s", a.unlocked_at.substr(0, 10).c_str());
+            }
         } else if (!secret) {
             ImGui::TextWrapped("%s", a.locked_description.c_str());
         } else {

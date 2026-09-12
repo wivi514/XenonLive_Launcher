@@ -11,14 +11,21 @@ namespace launcher {
 
 void DrawSignIn(App& app) {
     const ImVec2 avail = ImGui::GetContentRegionAvail();
-    const float width = 380.0f;
+    const float width = 420.0f;
     ImGui::SetCursorPosX((avail.x - width) * 0.5f);
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + avail.y * 0.18f);
 
-    ImGui::BeginChild("signin", ImVec2(width, 0.0f), ImGuiChildFlags_AutoResizeY);
-    ImGui::TextDisabled("XenonLive");
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 18.0f));
+    ImGui::BeginChild("signin", ImVec2(width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders,
+                      ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::PopStyleVar();
+    ImGui::PushFont(app.fonts.title);
+    ImGui::TextColored(xlive::theme::kLime, "Xenon");
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::TextUnformatted("Live");
+    ImGui::PopFont();
     if (app.adding_account) {
-        ImGui::SameLine(width - 60.0f);
+        ImGui::SameLine(width - 80.0f);
         if (ImGui::SmallButton("Back")) app.adding_account = false;
     }
     ImGui::Separator();
@@ -97,7 +104,7 @@ void DrawSignIn(App& app) {
                                 ? app.client->Register(app.signin.gamertag, app.signin.password)
                                 : app.client->SignIn(app.signin.gamertag, app.signin.password);
     };
-    if (ImGui::Button("Sign in", ImVec2(width * 0.5f - 4.0f, 0.0f)) || enter) submit(false);
+    if (ImGui::Button("Sign in", ImVec2((ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f, 0.0f)) || enter) submit(false);
     ImGui::SameLine();
     if (ImGui::Button("Register", ImVec2(-1.0f, 0.0f))) submit(true);
     ImGui::EndDisabled();
@@ -120,7 +127,7 @@ void DrawSignIn(App& app) {
             }
         }
         if (app.config.allow_insecure) {
-            ImGui::TextColored(ImVec4(0.9f, 0.7f, 0.35f, 1.0f),
+            ImGui::TextColored(xlive::theme::kAmber,
                                "allow_insecure is on in launcher.json: plain http, no certificate check");
         }
         ImGui::EndDisabled();
@@ -132,7 +139,7 @@ void DrawSignIn(App& app) {
     } else if (!app.signin.error.empty()) {
         // The server's code, verbatim: "bad_credentials", "taken",
         // "bad_gamertag". A player can read it and a bug report can quote it.
-        ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.0f), "%s", app.signin.error.c_str());
+        ImGui::TextColored(xlive::theme::kRed, "%s", app.signin.error.c_str());
         if (app.signin.error == "bad_gamertag") {
             ImGui::TextWrapped("A gamertag starts with a letter and is at most 15 letters, "
                                "digits and single spaces.");

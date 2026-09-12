@@ -1,6 +1,7 @@
 #include "toasts.h"
 
 #include "imgui.h"
+#include "theme.h"
 
 namespace launcher {
 
@@ -49,7 +50,17 @@ void Toasts::Draw() {
                                        ImGuiWindowFlags_NoFocusOnAppearing |
                                        ImGuiWindowFlags_NoNav;
         ImGui::PushID(int(i));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 12.0f));
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, xlive::theme::kPanel);
         if (ImGui::Begin("##toast", nullptr, flags)) {
+            // The lime edge the console's own notifications had.
+            const ImVec2 min = ImGui::GetWindowPos();
+            const ImVec2 max(min.x + ImGui::GetWindowSize().x, min.y + ImGui::GetWindowSize().y);
+            ImGui::GetWindowDrawList()->AddRectFilled(
+                min, ImVec2(min.x + 5.0f, max.y), ImGui::GetColorU32(xlive::theme::kLime),
+                ImGui::GetStyle().WindowRounding, ImDrawFlags_RoundCornersLeft);
+            ImGui::GetWindowDrawList()->AddRect(min, max, ImGui::GetColorU32(xlive::theme::kBorder),
+                                                ImGui::GetStyle().WindowRounding);
             ImGui::PushTextWrapPos(400.0f);
             ImGui::TextUnformatted(toast.text.c_str());
             ImGui::PopTextWrapPos();
@@ -65,6 +76,8 @@ void Toasts::Draw() {
             y -= ImGui::GetWindowSize().y + 8.0f;
         }
         ImGui::End();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar();
         ImGui::PopID();
     }
 }

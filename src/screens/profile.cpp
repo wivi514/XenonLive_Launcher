@@ -29,9 +29,7 @@ const Achievement* FindAchievement(const xlive::Client::TitleInfo& title, uint16
 
 void DrawProgressBar(uint32_t have, uint32_t of, const char* overlay) {
     const float fraction = of ? float(have) / float(of) : 0.0f;
-    ImGui::PushStyleColor(ImGuiCol_PlotHistogram, ImVec4(0.35f, 0.65f, 0.35f, 1.0f));
     ImGui::ProgressBar(fraction, ImVec2(260.0f, 0.0f), overlay);
-    ImGui::PopStyleColor();
 }
 
 // One side of a comparison row: a check with the date, or a dash.
@@ -39,7 +37,7 @@ void DrawSide(const char* who, const Achievement* a) {
     ImGui::TextDisabled("%s", who);
     ImGui::SameLine();
     if (a && a->unlocked) {
-        ImGui::TextColored(ImVec4(0.45f, 0.85f, 0.45f, 1.0f), "unlocked");
+        ImGui::TextColored(xlive::theme::kLime, "unlocked");
         if (!a->unlocked_at.empty()) {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", DateOf(a->unlocked_at).c_str());
@@ -56,7 +54,7 @@ void DrawCompare(App& app) {
         return;
     }
     if (!p.compare_error.empty()) {
-        ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.0f), "%s", p.compare_error.c_str());
+        ImGui::TextColored(xlive::theme::kRed, "%s", p.compare_error.c_str());
         if (p.compare_error == "not_friends") {
             ImGui::TextWrapped("%s has not accepted you as a friend yet.", p.gamertag.c_str());
         }
@@ -76,7 +74,9 @@ void DrawCompare(App& app) {
         ImGui::SameLine();
     }
     ImGui::BeginGroup();
+    ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", theirs.name.c_str());
+    ImGui::PopFont();
     ImGui::Text("%s: %u / %u G, %u of %zu", p.gamertag.c_str(), theirs.gamerscore,
                 theirs.max_gamerscore, their_count, theirs.achievements.size());
     ImGui::Text("You: %u / %u G, %u of %zu", mine.gamerscore, mine.max_gamerscore, my_count,
@@ -158,13 +158,13 @@ void DrawProfile(App& app) {
     const bool listed = app.client && app.client->FriendByXUID(p.xuid, entry);
     const bool is_friend = listed && entry.is_friend();
 
-    ImGui::PushFont(nullptr);
-    ImGui::Text("%s", p.gamertag.c_str());
+    ImGui::PushFont(app.fonts.title);
+    ImGui::TextColored(xlive::theme::kLime, "%s", p.gamertag.c_str());
     ImGui::PopFont();
     if (p.card_ticket != 0) {
         ImGui::TextDisabled("loading...");
     } else if (!p.card_error.empty()) {
-        ImGui::TextColored(ImVec4(0.9f, 0.4f, 0.4f, 1.0f), "%s", p.card_error.c_str());
+        ImGui::TextColored(xlive::theme::kRed, "%s", p.card_error.c_str());
     } else if (p.card_loaded) {
         const xlive::Client::Gamercard& card = p.card.card;
         ImGui::TextDisabled("%u G", card.gamerscore);
@@ -220,7 +220,7 @@ void DrawProfile(App& app) {
     const xlive::Client::Gamercard& card = p.card.card;
 
     // -- games ------------------------------------------------------------------
-    ImGui::SeparatorText("Games");
+    xlive::theme::Section("Games");
     if (!card.achievements_visible) {
         ImGui::TextWrapped("%s's achievements are visible to the friends they have accepted.",
                            p.gamertag.c_str());
@@ -235,7 +235,9 @@ void DrawProfile(App& app) {
             ImGui::SameLine();
         }
         ImGui::BeginGroup();
+        ImGui::PushFont(app.fonts.heading);
         ImGui::Text("%s", t.name.c_str());
+        ImGui::PopFont();
         ImGui::SameLine();
         ImGui::TextDisabled("%u / %u G", t.gamerscore, t.max_gamerscore);
         if (!t.last_unlocked_at.empty()) {
@@ -258,7 +260,7 @@ void DrawProfile(App& app) {
     }
 
     if (p.compare_title != 0) {
-        ImGui::SeparatorText("Achievements");
+        xlive::theme::Section("Achievements");
         DrawCompare(app);
     }
 }

@@ -8,7 +8,7 @@ namespace launcher {
 
 void DrawInvites(App& app) {
     const auto inbox = app.client->invites();
-    ImGui::SeparatorText("Invitations");
+    xlive::theme::Section("Invitations");
     if (inbox.empty()) {
         ImGui::TextDisabled("Nothing waiting.");
         return;

@@ -736,54 +736,56 @@ void App::Frame() {
 }
 
 void App::DrawRail() {
-    ImGui::BeginChild("rail", ImVec2(170.0f, 0.0f), ImGuiChildFlags_Borders);
-    ImGui::Spacing();
-    ImGui::TextDisabled("XenonLive");
-    ImGui::Separator();
-    ImGui::Spacing();
+    namespace theme = xlive::theme;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, theme::kRail);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 14.0f));
+    ImGui::BeginChild("rail", ImVec2(210.0f, 0.0f), ImGuiChildFlags_None,
+                      ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::PopStyleVar();
 
-    const auto tab_button = [&](const char* label, Tab which) {
+    // The wordmark, lime on charcoal, the way the dashboard's was.
+    ImGui::PushFont(fonts.title);
+    ImGui::TextColored(theme::kLime, "Xenon");
+    ImGui::SameLine(0.0f, 0.0f);
+    ImGui::TextUnformatted("Live");
+    ImGui::PopFont();
+    ImGui::Dummy(ImVec2(0.0f, 10.0f));
+
+    const auto blade = [&](const char* label, Tab which, const char* badge = nullptr) {
         const bool selected = tab == which || (which == Tab::Friends && tab == Tab::Profile);
-        if (selected) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::Button(label, ImVec2(-1.0f, 0.0f))) {
+        if (theme::RailItem(label, selected, badge)) {
             tab = which;
             if (which == Tab::Achievements && !achievements.loaded && achievements.ticket == 0 &&
                 !config.titles.empty()) {
                 LoadAchievements(achievements.title_index < 0 ? 0 : achievements.title_index);
             }
         }
-        if (selected) ImGui::PopStyleColor();
     };
-    tab_button("Home", Tab::Home);
-    tab_button("Friends", Tab::Friends);
+    blade("Home", Tab::Home);
+    blade("Friends", Tab::Friends);
     const size_t inbox = client ? client->invites().size() : 0;
-    if (inbox > 0) {
-        char label[32];
-        std::snprintf(label, sizeof(label), "Invites (%zu)", inbox);
-        tab_button(label, Tab::Invites);
-    } else {
-        tab_button("Invites", Tab::Invites);
-    }
-    tab_button("Achievements", Tab::Achievements);
+    char badge[16] = {};
+    if (inbox > 0) std::snprintf(badge, sizeof(badge), "%zu", inbox);
+    blade("Invites", Tab::Invites, badge);
+    blade("Achievements", Tab::Achievements);
 
-    // The account, at the bottom.
-    const float footer = ImGui::GetTextLineHeightWithSpacing() * 3.0f + 8.0f;
-    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - footer);
-    ImGui::Separator();
-    ImGui::TextUnformatted(gamertag().c_str());
-    if (client) {
-        const bool online = client->online();
-        ImGui::TextColored(online ? ImVec4(0.45f, 0.85f, 0.45f, 1.0f)
-                                  : ImVec4(0.85f, 0.65f, 0.35f, 1.0f),
-                           online ? "online" : "offline");
-    }
+    // The gamercard, at the bottom.
+    const float card_h = fonts.heading->FontSize + ImGui::GetTextLineHeight() * 2.0f + 26.0f;
+    ImGui::SetCursorPosY(ImGui::GetWindowHeight() - card_h - 14.0f);
+    const bool online = client && client->online();
+    theme::Gamercard(gamertag().c_str(), client ? client->identity().gamerscore : 0u, online,
+                     online ? "online" : "offline");
     ImGui::EndChild();
+    ImGui::PopStyleColor();
 }
 
 void App::DrawContent() {
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, xlive::theme::kBg);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(18.0f, 14.0f));
     ImGui::BeginChild("content", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None,
-                      ImGuiWindowFlags_NoSavedSettings);
-    ImGui::Spacing();
+                      ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysUseWindowPadding);
+    ImGui::PopStyleVar();
+    ImGui::PopStyleColor();
     if (tab != Tab::Friends) friends.open = false;
     switch (tab) {
         case Tab::Home:         DrawHome(*this); break;

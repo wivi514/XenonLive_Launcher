@@ -41,10 +41,9 @@ struct Config {
     // Sets XLIVE_ALLOW_INSECURE=1 for the launcher and every title it
     // starts: plain http and no certificate check. Local development only.
     bool allow_insecure = false;
-    // An optional TTF for a font with accents or CJK; empty means ImGui's
-    // built-in ProggyClean, which is ASCII only.
+    // An optional TTF to use instead of the bundled Selawik (for CJK, say).
     std::string font_path;
-    float font_size = 16.0f;
+    float font_size = 18.0f;
     // Where installed games go; empty means GamesDir()'s default.
     std::string games_dir;
     std::vector<TitleEntry> titles;

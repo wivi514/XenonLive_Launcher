@@ -90,7 +90,7 @@ bool LoadConfig(Config& out, std::string& error) {
     if (doc.Has("server")) out.server = doc["server"].AsString();
     if (doc.Has("allow_insecure")) out.allow_insecure = doc["allow_insecure"].AsBool();
     if (doc.Has("font_path")) out.font_path = doc["font_path"].AsString();
-    if (doc.Has("font_size")) out.font_size = float(doc["font_size"].AsDouble(16.0));
+    if (doc.Has("font_size")) out.font_size = float(doc["font_size"].AsDouble(18.0));
     if (doc.Has("games_dir")) out.games_dir = doc["games_dir"].AsString();
 
     const xlive::json::Value& titles = doc["titles"];
