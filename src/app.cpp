@@ -837,12 +837,18 @@ void App::InstallGame(const CatalogGame& item) {
     QueueInstallJob(item.key, true);
 }
 
-void App::CheckGame(const CatalogGame& item) { QueueInstallJob(item.key, false); }
+void App::CheckReleases() {
+    for (const CatalogGame& item : Catalog()) QueueInstallJob(item.key, false);
+    last_release_check = ImGui::GetTime();
+    next_release_check_ = last_release_check + kReleaseCheckInterval;
+}
 
-void App::CheckInstalledGames() {
-    for (const TitleEntry& entry : config.titles) {
-        if (entry.managed() && CatalogByKey(entry.key)) QueueInstallJob(entry.key, false);
+bool App::release_check_running() const {
+    if (installer.busy() && !current_job_.install) return true;
+    for (const InstallJob& job : install_queue_) {
+        if (!job.install) return true;
     }
+    return false;
 }
 
 std::string App::PackageState(const TitleEntry& entry) const {
@@ -873,12 +879,26 @@ void App::PollInstaller() {
         const CatalogGame* item = CatalogByKey(progress.key);
         std::fprintf(stderr, "[installer] %s: %s %s\n", progress.key.c_str(),
                      PhaseName(progress.phase), progress.message.c_str());
-        if (progress.phase == InstallPhase::Failed) {
+        if (progress.phase == InstallPhase::Failed && !current_job_.install) {
+            // A background check that could not reach GitHub is a line on
+            // the Home tab, not a toast every five minutes.
+            release_check_error = progress.message;
+        } else if (progress.phase == InstallPhase::Failed) {
             install_errors[progress.key] = progress.message;
             if (item) toasts.Push(std::string(item->name) + ": " + progress.message, 8.0);
         } else if (item) {
+            release_check_error.clear();
             latest_tags[progress.key] = progress.release.tag;
             release_pages[progress.key] = progress.release.html_url;
+            // A newer release than the installed one is said once.
+            const int installed_at = TitleIndexForKey(item->key);
+            if (installed_at >= 0 && !progress.installed &&
+                config.titles[size_t(installed_at)].version != progress.release.tag &&
+                announced_updates_.insert(std::string(item->key) + "@" + progress.release.tag).second) {
+                toasts.Push(std::string(item->name) + " " + progress.release.tag +
+                                " is available - update from Home",
+                            8.0);
+            }
             if (progress.installed) {
                 // The install becomes an ordinary title: everything else —
                 // Play, invites, achievements — works off the entry from here.
@@ -910,6 +930,7 @@ void App::PollInstaller() {
     if (!installer.busy() && !install_queue_.empty()) {
         const InstallJob job = install_queue_.front();
         install_queue_.pop_front();
+        current_job_ = job;
         if (const CatalogGame* item = CatalogByKey(job.key)) {
             if (job.install) {
                 installer.Install(*item, config.InstallDir(item->key));
@@ -1058,10 +1079,8 @@ void App::Frame() {
     PollPending();
     PollGame();
     PollInstaller();
-    if (!checked_installed_) {
-        checked_installed_ = true;
-        CheckInstalledGames();
-    }
+    // Releases: on the first frame, then every five minutes.
+    if (ImGui::GetTime() >= next_release_check_) CheckReleases();
 
     const ImGuiViewport* viewport = ImGui::GetMainViewport();
     ImGui::SetNextWindowPos(viewport->WorkPos);

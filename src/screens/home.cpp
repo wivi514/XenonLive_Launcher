@@ -144,8 +144,6 @@ void DrawGame(App& app, const CatalogGame& game) {
         ImGui::SameLine();
         if (xlive::theme::SmallSecondaryButton("Folder")) OpenFolder(entry->cwd);
     }
-    ImGui::SameLine();
-    if (xlive::theme::SmallSecondaryButton("Check for updates")) app.CheckGame(game);
     const auto page = app.release_pages.find(game.key);
     if (page != app.release_pages.end() && !page->second.empty()) {
         ImGui::SameLine();
@@ -211,10 +209,23 @@ void DrawHome(App& app) {
     ImGui::Spacing();
     xlive::theme::Section("Games");
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("Releases are downloaded from GitHub as %s builds (this launcher's own "
-                        "kind) and checked against the release's SHA256SUMS. You supply your own "
-                        "copy of each game.", FlavourName(PlatformFlavour()));
+    ImGui::TextDisabled("Releases come from GitHub as %s builds (this launcher's own kind), checked "
+                        "against the release's SHA256SUMS. You supply your own copy of each game.",
+                        FlavourName(PlatformFlavour()));
     ImGui::PopTextWrapPos();
+    // The release check runs by itself: when the launcher starts, then
+    // every five minutes. This line says where it is.
+    if (app.release_check_running()) {
+        ImGui::TextDisabled("checking for new releases...");
+    } else if (!app.release_check_error.empty()) {
+        ImGui::TextColored(kAmber, "could not check for releases: %s", app.release_check_error.c_str());
+        ImGui::SameLine();
+        ImGui::TextDisabled("- tried again every 5 minutes");
+    } else if (app.last_release_check >= 0.0) {
+        const int ago = int((ImGui::GetTime() - app.last_release_check) / 60.0);
+        if (ago < 1) ImGui::TextDisabled("releases checked just now - again in 5 minutes");
+        else ImGui::TextDisabled("releases checked %d min ago - again every 5 minutes", ago);
+    }
     for (const CatalogGame& game : Catalog()) DrawGame(app, game);
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextDisabled("installed under %s",

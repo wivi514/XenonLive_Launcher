@@ -165,9 +165,12 @@ shader cache survive. Installed games live under
 them. A machine without FUSE gets `APPIMAGE_EXTRACT_AND_RUN=1`, which the
 AppImage runtime honours.
 
-The launcher checks each installed game against GitHub's latest release when
-it starts, and on *Check for updates*. That is one unauthenticated request per
-game (GitHub allows 60 an hour per address).
+The launcher checks every catalog game against GitHub's latest release when
+it starts and every five minutes after; there is no button. A newer release
+than the installed one is announced once, with *Update to …* on the card.
+That is one unauthenticated request per game per check — 24 an hour for
+two games, under GitHub's 60 an hour per address. A check that fails shows
+one amber line on Home and tries again on the next round, never a toast.
 
 A build you point at by hand — a dev tree, say — still works: a `titles` entry
 in `launcher.json` with `exe`/`cwd`/`env` and no `key` shows up under *Builds

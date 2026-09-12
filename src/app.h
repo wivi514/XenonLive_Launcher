@@ -270,10 +270,16 @@ public:
     // The last failure per key, shown on the card until the next attempt.
     std::map<std::string, std::string> install_errors;
     void InstallGame(const CatalogGame& game);
-    void CheckGame(const CatalogGame& game);
-    // Queues a latest-release check for every installed catalog game; they
-    // run one at a time behind the installer.
-    void CheckInstalledGames();
+    // Queues a latest-release check for every catalog game; they run one
+    // at a time behind the installer. Done on the first frame and every
+    // kReleaseCheckInterval after, never by a button.
+    void CheckReleases();
+    static constexpr double kReleaseCheckInterval = 5.0 * 60.0;
+    // When the last round of checks began (ImGui time, seconds), and what
+    // went wrong with the last one that did, for a line on the Home tab.
+    double last_release_check = -1.0;
+    std::string release_check_error;
+    bool release_check_running() const;
     int TitleIndexForKey(const std::string& key) const;
     // What the install directory holds: "no package yet", "package found",
     // "ready" (the first run has unpacked it).
@@ -296,7 +302,13 @@ private:
         bool install = false;
     };
     std::deque<InstallJob> install_queue_;
-    bool checked_installed_ = false;
+    // The job the installer is on, so a failed check stays quiet and a
+    // failed install does not.
+    InstallJob current_job_;
+    double next_release_check_ = 0.0;
+    // Updates already announced with a toast, as key + tag, so a check
+    // every few minutes says it once.
+    std::set<std::string> announced_updates_;
     void QueueInstallJob(const std::string& key, bool install);
     void PollInstaller();
 
