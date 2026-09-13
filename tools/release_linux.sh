@@ -118,6 +118,16 @@ fi
 
 echo "==> \$NAME-linux-x86_64.tar.zst"
 (cd "\$OUT/.stage-linux" && rm -f "\$OUT/\$NAME-linux-x86_64.tar.zst" && tar --zstd -cf "\$OUT/\$NAME-linux-x86_64.tar.zst" "\$NAME")
+
+# The Steam Deck tarball: the same files (the old base's glibc floor is well
+# under SteamOS 3's) plus a .flavour marker, which is what makes this launcher
+# install the games' steamdeck .tar.gz bundles rather than the .tar.zst ones.
+# gzip rather than zstd because that is what SteamOS's own tar opens without
+# asking, and what the ports' Deck bundles use.
+echo "==> \$NAME-steamdeck-x86_64.tar.gz"
+echo steamdeck > "\$STAGE/.flavour"
+(cd "\$OUT/.stage-linux" && rm -f "\$OUT/\$NAME-steamdeck-x86_64.tar.gz" && tar -czf "\$OUT/\$NAME-steamdeck-x86_64.tar.gz" "\$NAME")
+rm -f "\$STAGE/.flavour"
 INNER
 
 echo "==> AppImage"
@@ -162,5 +172,5 @@ fi
 rm -rf "$T"
 
 rm -rf "$OUT/.stage-linux"
-(cd "$OUT" && sha256sum $(ls "$NAME"-*.tar.zst "$NAME"-*.AppImage "$NAME"-*.zip 2>/dev/null) > SHA256SUMS)
+(cd "$OUT" && sha256sum $(ls "$NAME"-*.tar.zst "$NAME"-*.tar.gz "$NAME"-*.AppImage "$NAME"-*.zip 2>/dev/null) > SHA256SUMS)
 echo "==> done:"; ls -la "$OUT" | sed 's/^/    /'; sed 's/^/    /' "$OUT/SHA256SUMS"

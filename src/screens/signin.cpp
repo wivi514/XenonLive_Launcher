@@ -113,7 +113,6 @@ void DrawSignIn(App& app) {
     const auto use_server = [&] {
         if (std::string(st.server) != app.config.server) app.RestartClient();
     };
-    const float half = (ImGui::GetContentRegionAvail().x - ImGui::GetStyle().ItemSpacing.x) * 0.5f;
 
     ImGui::BeginDisabled(busy);
     switch (st.mode) {

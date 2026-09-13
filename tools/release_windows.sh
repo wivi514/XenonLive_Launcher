@@ -104,6 +104,6 @@ echo "    DLL imports of the executable:"
 x86_64-w64-mingw32-objdump -p "\$STAGE/xenonlive_launcher.exe" | grep 'DLL Name' | sed 's/^/      /'
 (cd "\$OUT/.stage-windows" && rm -f "\$OUT/\$NAME-windows-x86_64.zip" && zip -qr "\$OUT/\$NAME-windows-x86_64.zip" "\$NAME")
 rm -rf "\$OUT/.stage-windows"
-(cd "\$OUT" && sha256sum \$(ls "\$NAME"-*.tar.zst "\$NAME"-*.AppImage "\$NAME"-*.zip 2>/dev/null) > SHA256SUMS)
+(cd "\$OUT" && sha256sum \$(ls "\$NAME"-*.tar.zst "\$NAME"-*.tar.gz "\$NAME"-*.AppImage "\$NAME"-*.zip 2>/dev/null) > SHA256SUMS)
 ls -la "\$OUT/\$NAME-windows-x86_64.zip"
 INNER

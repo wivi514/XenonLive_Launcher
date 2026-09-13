@@ -147,6 +147,7 @@ bool ApplySelfUpdate(const std::filesystem::path& staging, std::string& error) {
         return true;
 #endif
     }
+    case Flavour::SteamDeck:
     case Flavour::Tar: {
         // A directory. Every staged file is renamed over its old self —
         // the running binary included; a rename swaps the inode under a

@@ -6,6 +6,8 @@
 #include <vector>
 
 #include "miniz.h"
+
+#include <algorithm>
 #include "zstd.h"
 
 #ifndef _WIN32
@@ -343,6 +345,128 @@ bool ExtractTarZstInto(const std::filesystem::path& archive, const std::filesyst
         if (progress) progress(consumed, total);
     }
     ZSTD_freeDStream(stream);
+    std::fclose(in);
+    if (ok) ok = writer.Finish(error);
+    return ok;
+}
+
+bool ExtractTarGzInto(const std::filesystem::path& archive, const std::filesystem::path& dir,
+                      const std::string& strip_top, std::string& error,
+                      const std::function<void(uint64_t, uint64_t)>& progress) {
+    std::FILE* in = std::fopen(archive.string().c_str(), "rb");
+    if (!in) {
+        error = "cannot open " + archive.filename().string();
+        return false;
+    }
+    std::error_code ec;
+    const uint64_t total = std::filesystem::file_size(archive, ec);
+
+    // A gzip member is a header, a raw deflate stream, and an 8-byte trailer
+    // (CRC-32, size). miniz inflates raw deflate; the header is walked here.
+    // Multiple members (a concatenated .gz) are handled by starting over
+    // when one stream ends with bytes left.
+    mz_stream stream{};
+    if (mz_inflateInit2(&stream, -MZ_DEFAULT_WINDOW_BITS) != MZ_OK) {
+        std::fclose(in);
+        error = "gzip: cannot create a decoder";
+        return false;
+    }
+    std::vector<uint8_t> in_buf(1 << 16);
+    std::vector<uint8_t> out_buf(1 << 16);
+    std::vector<uint8_t> pending;  // input not yet handed on
+    TarWriter writer(dir, strip_top);
+    uint64_t consumed = 0;
+    bool ok = true;
+    enum { Header, Deflate, Trailer } state = Header;
+    size_t trailer_left = 0;
+
+    // Walks a gzip member header at the front of buf. 1 with `used` set,
+    // 0 when more bytes are needed, -1 when it is not gzip at all.
+    const auto parse_header = [](const std::vector<uint8_t>& buf, size_t& used) -> int {
+        if (buf.size() < 10) return 0;
+        if (buf[0] != 0x1f || buf[1] != 0x8b || buf[2] != 8) return -1;
+        const uint8_t flags = buf[3];
+        size_t at = 10;
+        if (flags & 0x04) {  // FEXTRA
+            if (buf.size() < at + 2) return 0;
+            at += 2 + (buf[at] | (size_t(buf[at + 1]) << 8));
+            if (buf.size() < at) return 0;
+        }
+        for (int bit : {0x08, 0x10}) {  // FNAME, FCOMMENT: NUL-terminated
+            if (!(flags & bit)) continue;
+            while (at < buf.size() && buf[at] != 0) ++at;
+            if (at >= buf.size()) return 0;
+            ++at;
+        }
+        if (flags & 0x02) {  // FHCRC
+            at += 2;
+            if (buf.size() < at) return 0;
+        }
+        used = at;
+        return 1;
+    };
+
+    while (ok) {
+        const size_t n = std::fread(in_buf.data(), 1, in_buf.size(), in);
+        if (n == 0) break;
+        consumed += n;
+        pending.insert(pending.end(), in_buf.begin(), in_buf.begin() + long(n));
+        size_t at = 0;
+        bool need_more = false;
+        while (ok && !need_more && at < pending.size()) {
+            switch (state) {
+            case Header: {
+                std::vector<uint8_t> rest(pending.begin() + long(at), pending.end());
+                size_t used = 0;
+                const int r = parse_header(rest, used);
+                if (r < 0) {
+                    error = "gzip: not a gzip file";
+                    ok = false;
+                } else if (r == 0) {
+                    need_more = true;
+                } else {
+                    at += used;
+                    mz_inflateReset(&stream);
+                    state = Deflate;
+                }
+                break;
+            }
+            case Deflate: {
+                stream.next_in = pending.data() + at;
+                stream.avail_in = unsigned(pending.size() - at);
+                stream.next_out = out_buf.data();
+                stream.avail_out = unsigned(out_buf.size());
+                const int rc = mz_inflate(&stream, MZ_NO_FLUSH);
+                const size_t produced = out_buf.size() - stream.avail_out;
+                at = pending.size() - stream.avail_in;
+                if (produced && !writer.Feed(out_buf.data(), produced, error)) {
+                    ok = false;
+                } else if (rc == MZ_STREAM_END) {
+                    state = Trailer;
+                    trailer_left = 8;
+                } else if (rc == MZ_BUF_ERROR && produced == 0) {
+                    need_more = true;
+                } else if (rc != MZ_OK && rc != MZ_BUF_ERROR) {
+                    error = std::string("gzip: ") + (mz_error(rc) ? mz_error(rc) : "inflate failed");
+                    ok = false;
+                }
+                break;
+            }
+            case Trailer: {
+                // CRC-32 and size: eight bytes to step over, then maybe
+                // another member.
+                const size_t skip = std::min(trailer_left, pending.size() - at);
+                at += skip;
+                trailer_left -= skip;
+                if (trailer_left == 0) state = Header;
+                break;
+            }
+            }
+        }
+        if (ok) pending.erase(pending.begin(), pending.begin() + long(std::min(at, pending.size())));
+        if (progress) progress(consumed, total);
+    }
+    mz_inflateEnd(&stream);
     std::fclose(in);
     if (ok) ok = writer.Finish(error);
     return ok;

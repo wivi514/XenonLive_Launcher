@@ -27,7 +27,7 @@ pinned archives and checks their hashes.
 
 ## Releases
 
-    tools/release_linux.sh      # XenonLiveLauncher-linux-x86_64.tar.zst and .AppImage
+    tools/release_linux.sh      # XenonLiveLauncher-linux-x86_64.tar.zst, .AppImage, and -steamdeck-x86_64.tar.gz
     tools/release_windows.sh    # XenonLiveLauncher-windows-x86_64.zip
 
 Both build in containers and need only podman. Linux builds on the ports'
@@ -41,7 +41,9 @@ is the trust store and nothing TLS-related ships. The output lands in
 
 **Which game build a launcher installs follows how the launcher itself was
 packaged**: the AppImage installs the games' AppImages, the tarball installs
-their `.tar.zst`, Windows installs the zip. An install is refused when the
+their `.tar.zst`, the Steam Deck tarball (the Linux files plus a `.flavour`
+marker beside the binary) installs their `-steamdeck-x86_64.tar.gz`, Windows
+installs the zip. An install is refused when the
 release's `SHA256SUMS` does not list the asset.
 
 ## What it does

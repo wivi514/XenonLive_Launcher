@@ -40,9 +40,11 @@ const CatalogGame* CatalogByTitle(uint32_t title_id);
 
 // How this launcher was packaged decides how a game is: a launcher running
 // as an AppImage installs the game's AppImage (one file beside its own
-// assets/), a launcher from the tarball installs the game's .tar.zst, and
-// Windows installs the zip.
-enum class Flavour { Zip, AppImage, Tar };
+// assets/), a launcher from the tarball installs the game's .tar.zst, the
+// Steam Deck tarball installs the game's steamdeck .tar.gz, and Windows
+// installs the zip. The Deck tarball is the Linux one plus a `.flavour`
+// file beside the binary saying "steamdeck" — same build, different games.
+enum class Flavour { Zip, AppImage, Tar, SteamDeck };
 Flavour PlatformFlavour();
 const char* FlavourName(Flavour flavour);
 

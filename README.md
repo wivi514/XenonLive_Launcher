@@ -24,9 +24,10 @@ Built by one developer, with AI assistance. Free. No ads, no telemetry.
 | Windows 10/11 | `XenonLiveLauncher-windows-x86_64.zip` | unzip anywhere, run `xenonlive_launcher.exe` |
 | Linux | `XenonLiveLauncher-linux-x86_64.AppImage` | `chmod +x` it, run it (needs FUSE, like any AppImage) |
 | Linux, no FUSE | `XenonLiveLauncher-linux-x86_64.tar.zst` | unpack, run `XenonLiveLauncher/xenonlive_launcher` |
-| Steam Deck | the AppImage | add it as a non-Steam game (below) |
+| Steam Deck | `XenonLiveLauncher-steamdeck-x86_64.tar.gz` | unpack, add `xenonlive_launcher` as a non-Steam game (below) |
 
-**On a Steam Deck**: in Desktop mode, `chmod +x` the AppImage and add it
+**On a Steam Deck**: in Desktop mode, unpack the Steam Deck tarball
+somewhere on the internal drive, add `XenonLiveLauncher/xenonlive_launcher`
 to Steam as a non-Steam game; it then runs from Game mode, full screen,
 with a larger UI, and the whole launcher works from the pad — the stick or
 d-pad moves, **A** picks, **B** goes back, **LB/RB** switch between the
@@ -54,6 +55,10 @@ against the release's checksums, and unpacks it. The card then shows a
 folder path: **put your game's XBLA package in it**, or press *Play* and
 drop the package onto the game's own window. The port unpacks the game on
 its first run, once.
+
+Each launcher installs the games built for it: the Windows launcher the
+Windows zip, the AppImage the games' AppImages, the tarball the `.tar.zst`
+builds, the Steam Deck tarball the games' Steam Deck builds.
 
 **4. Play.** *Play* starts the game signed in as you. Leave the launcher
 open while you play: that is what keeps you online for your friends.

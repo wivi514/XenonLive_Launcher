@@ -25,4 +25,10 @@ bool ExtractTarZstInto(const std::filesystem::path& archive, const std::filesyst
                        const std::string& strip_top, std::string& error,
                        const std::function<void(uint64_t done, uint64_t total)>& progress = {});
 
+// The same for a .tar.gz (the Steam Deck bundle): gzip, inflated with
+// miniz, through the same ustar reader.
+bool ExtractTarGzInto(const std::filesystem::path& archive, const std::filesystem::path& dir,
+                      const std::string& strip_top, std::string& error,
+                      const std::function<void(uint64_t done, uint64_t total)>& progress = {});
+
 }  // namespace launcher

@@ -365,7 +365,7 @@ void Installer::Run(const CatalogGame* game, std::filesystem::path dir, bool ins
         return release.asset_name.size() >= s.size() &&
                release.asset_name.compare(release.asset_name.size() - s.size(), s.size(), s) == 0;
     };
-    if (ends_with(".zip") || ends_with(".tar.zst")) {
+    if (ends_with(".zip") || ends_with(".tar.zst") || ends_with(".tar.gz")) {
         // The archive carries one top directory (the bundle name); its
         // contents go straight into dir/, over whatever an earlier version
         // put there. The player's assets/ is never removed: an update is
@@ -376,8 +376,9 @@ void Installer::Run(const CatalogGame* game, std::filesystem::path dir, bool ins
             progress_.total = total;
         };
         const std::string top = std::string(game->bundle) + "/";
-        const bool ok = ends_with(".zip") ? ExtractZipInto(part, dir, top, error, on_progress)
-                                          : ExtractTarZstInto(part, dir, top, error, on_progress);
+        const bool ok = ends_with(".zip")      ? ExtractZipInto(part, dir, top, error, on_progress)
+                        : ends_with(".tar.gz") ? ExtractTarGzInto(part, dir, top, error, on_progress)
+                                               : ExtractTarZstInto(part, dir, top, error, on_progress);
         std::filesystem::remove(part, ec);
         if (!ok) {
             Fail(error);

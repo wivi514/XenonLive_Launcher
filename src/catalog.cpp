@@ -1,5 +1,7 @@
 #include "catalog.h"
 
+#include <fstream>
+
 #include <cstdlib>
 #include <filesystem>
 
@@ -18,15 +20,24 @@ Flavour PlatformFlavour() {
     // a terminal that is itself an AppImage exports the same variables to
     // every shell it opens — the same containment test the ports use.
     static const Flavour flavour = [] {
-        const char* appimage = std::getenv("APPIMAGE");
-        const char* appdir = std::getenv("APPDIR");
-        if (!appimage || !*appimage || !appdir || !*appdir) return Flavour::Tar;
         char exe[4096];
         const ssize_t n = ::readlink("/proc/self/exe", exe, sizeof(exe) - 1);
-        if (n <= 0) return Flavour::Tar;
-        exe[n] = '\0';
-        const std::string path(exe), dir(appdir);
-        return path.rfind(dir, 0) == 0 ? Flavour::AppImage : Flavour::Tar;
+        const std::string path = n > 0 ? std::string(exe, size_t(n)) : std::string();
+        const char* appimage = std::getenv("APPIMAGE");
+        const char* appdir = std::getenv("APPDIR");
+        if (appimage && *appimage && appdir && *appdir && !path.empty() &&
+            path.rfind(std::string(appdir), 0) == 0) {
+            return Flavour::AppImage;
+        }
+        // The Steam Deck tarball marks itself with a file beside the binary.
+        if (!path.empty()) {
+            std::ifstream marker(std::filesystem::path(path).parent_path() / ".flavour");
+            std::string word;
+            if (marker && std::getline(marker, word) && word.rfind("steamdeck", 0) == 0) {
+                return Flavour::SteamDeck;
+            }
+        }
+        return Flavour::Tar;
     }();
     return flavour;
 #endif
@@ -37,6 +48,7 @@ const char* FlavourName(Flavour flavour) {
         case Flavour::Zip:      return "zip";
         case Flavour::AppImage: return "AppImage";
         case Flavour::Tar:      return "tar.zst";
+        case Flavour::SteamDeck: return "Steam Deck tar.gz";
     }
     return "?";
 }
@@ -85,6 +97,7 @@ std::string PlatformAssetName(const CatalogGame& game) {
         case Flavour::Zip:      return std::string(game.bundle) + "-windows-x86_64.zip";
         case Flavour::AppImage: return std::string(game.bundle) + "-linux-x86_64.AppImage";
         case Flavour::Tar:      return std::string(game.bundle) + "-linux-x86_64.tar.zst";
+        case Flavour::SteamDeck: return std::string(game.bundle) + "-steamdeck-x86_64.tar.gz";
     }
     return {};
 }
@@ -94,6 +107,7 @@ std::string PlatformExecutable(const CatalogGame& game) {
         case Flavour::Zip:      return std::string(game.runtime) + ".exe";
         case Flavour::AppImage: return PlatformAssetName(game);
         case Flavour::Tar:      return game.runtime;
+        case Flavour::SteamDeck: return game.runtime;
     }
     return {};
 }
