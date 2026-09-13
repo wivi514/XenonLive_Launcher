@@ -35,6 +35,10 @@ tabs on the left. Typing (a gamertag, a password, a message) uses the
 Deck's keyboard: **Steam + X**. The games' overlay works the same way
 (**View+Menu** opens it, LB/RB switch its tabs).
 
+**Requirements**: Windows 10/11 64-bit, or Linux x86_64 (glibc 2.34 or
+newer — anything from 2022 on; SteamOS 3 included). The games themselves
+need a Vulkan-capable GPU; their pages say more.
+
 Windows may show a SmartScreen warning the first time ("unknown publisher")
 — *More info → Run anyway*. The launcher is not signed; the `SHA256SUMS`
 file on the release page lets you check what you downloaded.
@@ -75,7 +79,8 @@ the 360 code recompiled, the graphics and sound re-done for PC, the Xbox
 Live parts pointed at XenonLive. Each port's page has its own README —
 what it needs, what works, what does not — and is where its bugs are
 tracked. The launcher installs whichever release the port's page marks as
-latest; the port's *Release notes* button on Home opens it.
+latest (v1.1.0 or newer has the XenonLive features); the port's *Release
+notes* button on Home opens it.
 
 What XenonLive brings to each: signing in with your gamertag, achievements
 and gamerscore that persist, friends and where they are, invitations and
