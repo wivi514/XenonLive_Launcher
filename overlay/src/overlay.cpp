@@ -611,6 +611,32 @@ void Overlay::Impl::DrainInput(uint32_t width, uint32_t height) {
                 const ImGuiKey key =
                     ImGui_ImplSDL2_KeyEventToImGuiKey(e.key.keysym.sym, e.key.keysym.scancode);
                 if (key != ImGuiKey_None) io.AddKeyEvent(key, e.type == SDL_KEYDOWN);
+                // A game window keeps SDL's text input off (composed text
+                // through the IME lags raw keys), and a port that does not
+                // turn it on for us sends no SDL_TEXTINPUT at all. Then the
+                // key itself is the character: the keysym is the layout's
+                // own unshifted symbol, shifted here for the US-ish cases.
+                // Enough for a gamertag or a message; a port that does turn
+                // text input on (Case West) delivers the real thing and
+                // this stays out of the way.
+                if (e.type == SDL_KEYDOWN && !SDL_IsTextInputActive() && io.WantTextInput &&
+                    !(mod & (KMOD_CTRL | KMOD_ALT | KMOD_GUI))) {
+                    const SDL_Keycode sym = e.key.keysym.sym;
+                    if (sym >= 0x20 && sym < 0x7F) {
+                        char c = char(sym);
+                        const bool shift = (mod & KMOD_SHIFT) != 0;
+                        const bool caps = (mod & KMOD_CAPS) != 0;
+                        if (c >= 'a' && c <= 'z') {
+                            if (shift != caps) c = char(c - 'a' + 'A');
+                        } else if (shift) {
+                            static const char* from = "1234567890-=[]\;',./`";
+                            static const char* to = "!@#$%^&*()_+{}|:\"<>?~";
+                            if (const char* at = std::strchr(from, c)) c = to[at - from];
+                        }
+                        const char text[2] = {c, 0};
+                        io.AddInputCharactersUTF8(text);
+                    }
+                }
                 break;
             }
             case SDL_CONTROLLERBUTTONDOWN:
