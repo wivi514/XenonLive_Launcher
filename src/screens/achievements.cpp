@@ -79,7 +79,7 @@ void DrawAchievements(App& app) {
     const float tile = 64.0f;
     for (const xlive::Client::Achievement& a : title.achievements) {
         ImGui::PushID(a.id);
-        ImGui::BeginChild("ach", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("ach", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         const bool secret = a.hidden && !a.unlocked;
 
         // The tile, from the SPA's own art via the server. Locked ones are

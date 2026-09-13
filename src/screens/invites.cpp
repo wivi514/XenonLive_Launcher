@@ -18,7 +18,7 @@ void DrawInvites(App& app) {
     }
     for (const xlive::Client::Invite& invite : inbox) {
         ImGui::PushID(int(invite.id));
-        ImGui::BeginChild("invite", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("invite", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         ImGui::Text("%s", invite.from_gamertag.c_str());
         ImGui::SameLine();
         ImGui::TextDisabled("invited you to %s", app.TitleName(invite.title_id).c_str());

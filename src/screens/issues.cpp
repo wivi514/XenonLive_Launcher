@@ -236,7 +236,7 @@ void DrawIssues(App& app) {
 
     // -- left: captures, then reports ---------------------------------------
     ImGui::PushStyleColor(ImGuiCol_ChildBg, kPanel);
-    ImGui::BeginChild("issues_list", ImVec2(300.0f * app.ui_scale, 0.0f), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("issues_list", ImVec2(300.0f * app.ui_scale, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
     ImGui::PopStyleColor();
 
     ImGui::PushFont(app.fonts.heading);
@@ -297,7 +297,7 @@ void DrawIssues(App& app) {
 
     // -- right: the selection -------------------------------------------------
     ImGui::SameLine();
-    ImGui::BeginChild("issues_detail", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None,
+    ImGui::BeginChild("issues_detail", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened,
                       ImGuiWindowFlags_AlwaysUseWindowPadding);
     if (st.selected_capture >= 0 && st.selected_capture < int(st.captures.size())) {
         DrawCaptureDetail(app, st.captures[size_t(st.selected_capture)]);

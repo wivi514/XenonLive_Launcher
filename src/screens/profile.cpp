@@ -106,7 +106,7 @@ void DrawCompare(App& app) {
         // has is not: the name is on the other player's card.
         const bool secret = t.hidden && !t.unlocked && !i_have;
         ImGui::PushID(t.id);
-        ImGui::BeginChild("cmp", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("cmp", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         const Image image = secret ? Image{} : app.images.Achievement(theirs.title_id, t.id);
         if (image.texture) {
             const bool anyone = t.unlocked || i_have;
@@ -227,7 +227,7 @@ void DrawProfile(App& app) {
     if (card.titles.empty()) ImGui::TextDisabled("This server has no titles imported.");
     for (const xlive::Client::PlayedTitle& t : card.titles) {
         ImGui::PushID(int(t.title_id));
-        ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         if (const Image tile_image = app.images.Title(t.title_id); tile_image.texture) {
             ImGui::Image(reinterpret_cast<ImTextureID>(tile_image.texture), ImVec2(40.0f, 40.0f));
             ImGui::SameLine();

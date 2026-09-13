@@ -1252,7 +1252,7 @@ void App::DrawRail() {
     // The background was painted by Frame; the child is see-through.
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(12.0f, 16.0f));
-    ImGui::BeginChild("rail", ImVec2(kRailWidth * ui_scale, 0.0f), ImGuiChildFlags_None,
+    ImGui::BeginChild("rail", ImVec2(kRailWidth * ui_scale, 0.0f), ImGuiChildFlags_NavFlattened,
                       ImGuiWindowFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();
 
@@ -1318,7 +1318,7 @@ void App::DrawRail() {
 void App::DrawContent() {
     ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0, 0, 0, 0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 18.0f));
-    ImGui::BeginChild("content", ImVec2(0.0f, 0.0f), ImGuiChildFlags_None,
+    ImGui::BeginChild("content", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened,
                       ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();
     ImGui::PopStyleColor();

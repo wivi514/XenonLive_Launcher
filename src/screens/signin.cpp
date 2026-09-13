@@ -18,7 +18,7 @@ void DrawSignIn(App& app) {
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + avail.y * (tall ? 0.05f : 0.18f));
 
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(22.0f, 18.0f));
-    ImGui::BeginChild("signin", ImVec2(width, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders,
+    ImGui::BeginChild("signin", ImVec2(width, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders,
                       ImGuiWindowFlags_AlwaysUseWindowPadding);
     ImGui::PopStyleVar();
     ImGui::PushFont(app.fonts.title);
@@ -54,7 +54,7 @@ void DrawSignIn(App& app) {
             ImGui::PushID(int(account.xuid & 0x7FFFFFFF));
             ImGui::PushID(int(account.xuid >> 32));
             ImGui::BeginChild("acct", ImVec2(0.0f, 0.0f),
-                              ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                              ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
             ImGui::TextUnformatted(account.gamertag.c_str());
             ImGui::SameLine(width - 150.0f);
             ImGui::BeginDisabled(busy);

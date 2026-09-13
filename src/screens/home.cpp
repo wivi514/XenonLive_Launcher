@@ -48,7 +48,7 @@ void DrawGame(App& app, const CatalogGame& game) {
         entry && latest != app.latest_tags.end() && latest->second != entry->version;
 
     ImGui::PushID(game.key);
-    ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
     // The title's tile, when the server has the title imported.
     if (const Image tile = app.images.Title(game.title_id); tile.texture) {
         ImGui::Image(reinterpret_cast<ImTextureID>(tile.texture), ImVec2(64.0f, 64.0f));
@@ -168,7 +168,7 @@ void DrawHome(App& app) {
         const bool working = app.launcher_updating();
         ImGui::PushStyleColor(ImGuiCol_Border, kAmber);
         ImGui::BeginChild("launcher_update", ImVec2(0.0f, 0.0f),
-                          ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                          ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         ImGui::PopStyleColor();
         ImGui::PushFont(app.fonts.heading);
         ImGui::TextColored(kAmber, "XenonLive Launcher %s is available", app.launcher_update.c_str());
@@ -208,7 +208,7 @@ void DrawHome(App& app) {
 
     // -- the account card ------------------------------------------------
     const xlive::Identity id = app.client->identity();
-    ImGui::BeginChild("account", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    ImGui::BeginChild("account", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
     ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", id.gamertag.c_str());
     ImGui::PopFont();
@@ -292,7 +292,7 @@ void DrawHome(App& app) {
         const TitleEntry& entry = app.config.titles[size_t(i)];
         if (entry.managed()) continue;
         ImGui::PushID(i);
-        ImGui::BeginChild("custom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("custom", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         ImGui::PushFont(app.fonts.heading);
         ImGui::Text("%s", entry.name.c_str());
         ImGui::PopFont();

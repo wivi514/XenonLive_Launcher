@@ -36,7 +36,7 @@ namespace {
 void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
     ImGui::PushID(int(f.xuid & 0x7FFFFFFF));
     ImGui::PushID(int(f.xuid >> 32));
-    ImGui::BeginChild("row", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    ImGui::BeginChild("row", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
 
     const bool online = f.presence.online();
     // The status dot, then the name in the heading face: the name is the

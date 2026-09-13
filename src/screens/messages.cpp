@@ -123,7 +123,7 @@ void DrawMessages(App& app) {
     if (!m.inbox_loaded && m.inbox_ticket == 0) app.RefreshInbox();
 
     // -- the people column --------------------------------------------------
-    ImGui::BeginChild("people", ImVec2(250.0f * app.ui_scale, 0.0f), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("people", ImVec2(250.0f * app.ui_scale, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
     xlive::theme::Section("Messages");
     const auto friends = app.client->friends();
     const auto find_friend = [&](uint64_t xuid) -> const xlive::Client::Friend* {
@@ -187,7 +187,7 @@ void DrawMessages(App& app) {
     // The log fills what the input box leaves.
     const float input_height = ImGui::GetTextLineHeight() * 3.0f + 24.0f + ImGui::GetFrameHeight();
     const float log_height = ImGui::GetContentRegionAvail().y - input_height;
-    ImGui::BeginChild("log", ImVec2(0.0f, log_height), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("log", ImVec2(0.0f, log_height), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
     const float column = ImGui::GetContentRegionAvail().x;
     if (!m.error.empty()) {
         ImGui::TextColored(kRed, "%s", m.error.c_str());

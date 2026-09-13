@@ -1050,7 +1050,7 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                 Push("Friend request sent to " + tag, 5.0, true);
                 std::memset(add_gamertag, 0, sizeof(add_gamertag));
             }
-            ImGui::BeginChild("friends", ImVec2(0, 0), ImGuiChildFlags_None);
+            ImGui::BeginChild("friends", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
             const auto list = c.friends();
             bool any = false;
             for (int pass = 0; pass < 2; ++pass) {
@@ -1060,7 +1060,7 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                     any = true;
                     ImGui::PushID(int(f.xuid & 0x7FFFFFFF));
                     ImGui::PushID(int(f.xuid >> 32));
-                    ImGui::BeginChild("row", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                    ImGui::BeginChild("row", ImVec2(0, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
                     ImGui::TextColored(f.presence.online() ? kGreen : kDim, "%s", f.gamertag.c_str());
                     ImGui::SameLine();
                     ImGui::TextDisabled("- %s", PresenceLine(f.presence).c_str());
@@ -1082,7 +1082,7 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                 any = true;
                 ImGui::PushID(int(f.xuid & 0x7FFFFFFF));
                 ImGui::PushID(int(f.xuid >> 32));
-                ImGui::BeginChild("req", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                ImGui::BeginChild("req", ImVec2(0, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
                 ImGui::Text("%s", f.gamertag.c_str());
                 ImGui::SameLine();
                 ImGui::TextDisabled("wants to be your friend");
@@ -1110,11 +1110,11 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
             ImGui::BeginDisabled(refresh_ticket != 0);
             if (ImGui::SmallButton("Refresh")) refresh_ticket = c.RefreshInvites();
             ImGui::EndDisabled();
-            ImGui::BeginChild("invites", ImVec2(0, 0), ImGuiChildFlags_None);
+            ImGui::BeginChild("invites", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
             if (invites.empty()) ImGui::TextDisabled("Nothing waiting.");
             for (const Client::Invite& invite : invites) {
                 ImGui::PushID(int(invite.id));
-                ImGui::BeginChild("inv", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+                ImGui::BeginChild("inv", ImVec2(0, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
                 ImGui::Text("%s", invite.from_gamertag.c_str());
                 ImGui::SameLine();
                 ImGui::TextDisabled("invited you to their game");
@@ -1173,7 +1173,7 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
     };
 
     // People on the left: those with a conversation, then the other friends.
-    ImGui::BeginChild("people", ImVec2(width * 0.3f, 0), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("people", ImVec2(width * 0.3f, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
     std::vector<uint64_t> listed;
     const auto person = [&](uint64_t xuid, const std::string& name, const Client::Message* latest) {
         ImGui::PushID(int(xuid & 0x7FFFFFFF));
@@ -1231,7 +1231,7 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
         ImGui::TextDisabled("%s", PresenceLine(f->presence).c_str());
     }
     const float input_h = ImGui::GetFrameHeight() * 2.0f + ImGui::GetStyle().ItemSpacing.y * 2.0f;
-    ImGui::BeginChild("log", ImVec2(0, ImGui::GetContentRegionAvail().y - input_h), ImGuiChildFlags_Borders);
+    ImGui::BeginChild("log", ImVec2(0, ImGui::GetContentRegionAvail().y - input_h), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
     if (conversation.empty() && !conversation_ticket) ImGui::TextDisabled("No messages yet.");
     for (const Client::Message& msg : conversation) {
         const bool from_me = msg.from_xuid == me;
@@ -1315,13 +1315,13 @@ void Overlay::Impl::DrawAchievements(Client& c, float width) {
     ImGui::TextDisabled("%u / %u G", c.title_gamerscore(), info.max_gamerscore);
     ImGui::Separator();
 
-    ImGui::BeginChild("achievements", ImVec2(0, 0), ImGuiChildFlags_None);
+    ImGui::BeginChild("achievements", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
     const float tile = 56.0f * scale;
     for (const auto& a : info.achievements) {
         const bool unlocked = a.unlocked || c.IsUnlocked(a.id);
         const bool secret = a.hidden && !unlocked;
         ImGui::PushID(a.id);
-        ImGui::BeginChild("row", ImVec2(0, 0), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+        ImGui::BeginChild("row", ImVec2(0, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
         auto found = tiles.find(a.image_id);
         if (!secret && found != tiles.end()) {
             const ImVec4 tint = unlocked ? ImVec4(1, 1, 1, 1) : ImVec4(0.5f, 0.5f, 0.5f, 0.75f);

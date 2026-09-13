@@ -33,7 +33,7 @@ const Link kContribute[] = {
 
 void DrawLink(App& app, const Link& link) {
     ImGui::PushID(link.url);
-    ImGui::BeginChild("link", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
+    ImGui::BeginChild("link", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
     ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", link.label);
     ImGui::PopFont();
