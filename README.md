@@ -217,12 +217,57 @@ output).
 
 ## For developers
 
-Building, releasing, the overlay's internals, `launcher.json`, self-hosting
-a server and the environment variables that drive the launcher headless
-are in [`docs/developing.md`](docs/developing.md). The server is
-[XenonLive](https://github.com/wivi514/XenonLive); the games are
-[Case Zero](https://github.com/wivi514/Dead_Rising_2_Case_Zero_Xenon_Recomp)
-and [Case West](https://github.com/wivi514/Dead_Rising_2_Case_West_Xenon_Recomp).
+## For developers
+
+### Want your XenonRecomp game on XenonLive?
+
+If you're working on an Xbox 360 recomp and want to add XenonLive support, get in touch with me.
+
+You **do not need to implement the XenonLive launcher/backend integration yourself**. Send me your project and the information I need, and I can handle the XenonLive side of the integration for your title.
+
+Depending on what the game supports, this can include:
+
+* XenonLive accounts and sign-in
+* Achievements and gamerscore
+* Friends and player presence
+* Game/session invites
+* Online multiplayer / co-op integration
+* Messages and notifications
+* The in-game XenonLive overlay
+* Launcher installation, updates and release detection
+* Game-specific presence such as menus, levels, modes or other activity
+* Issue reporting / capture integration
+* Other Xbox Live functionality that makes sense for the title
+
+Not every Xbox 360 game uses the same Live functionality, so the exact integration can be adapted to the game.
+
+### What I need from you
+
+When contacting me, send whatever applies to your project:
+
+* Game name
+* Xbox 360 Title ID
+* Link to your recomp repository
+* Link to your releases/builds
+* The name or names you want shown in the credits
+* Your GitHub profile or project page
+* Patreon, Ko-fi, GitHub Sponsors or any other support links you want displayed
+* Any website, Discord or community link you want associated with the project
+* A short description of the recomp
+* Which XenonLive features you want supported
+* Any special installation or launch requirements
+
+I want XenonLive to properly credit the people actually doing the recomp work. Your project page, credits and support links can be shown alongside the game in the launcher so players know **who made the port and where to support or follow its development**.
+
+I'll handle adding the title to XenonLive, the launcher integration and the XenonLive-specific work needed for the game. We'll coordinate on any game-side hooks or information I need from your recomp.
+
+The goal is to make it easy for other Xbox 360 recomp projects to get achievements, social features and online functionality working without every developer having to build their own Xbox Live replacement and launcher infrastructure.
+
+### Contact
+
+You can also contact me through GitHub: [@wivi514](https://github.com/wivi514).
+
+For developers who want to work directly on XenonLive itself, building, releasing, the overlay internals, `launcher.json`, self-hosting a server and the environment variables used by the launcher are documented in [`docs/developing.md`](docs/developing.md).
 
 ## Credits
 
