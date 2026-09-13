@@ -217,8 +217,6 @@ output).
 
 ## For developers
 
-## For developers
-
 ### Want your XenonRecomp game on XenonLive?
 
 If you're working on an Xbox 360 recomp and want to add XenonLive support, get in touch with me.
