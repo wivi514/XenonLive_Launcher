@@ -39,7 +39,8 @@ namespace {
 // happened|steps" fills the form and sends it; XENONLIVE_ISSUE_SEARCH=<words>
 // searches the reports and selects the first hit (a blank one lists them, as
 // a developer sees them), and XENONLIVE_ISSUE_FETCH=1 then fetches the
-// selected report's capture as a developer. XENONLIVE_SET_EMAIL=<addr>
+// selected report's capture as a developer; XENONLIVE_ISSUE_GAME=<title id>
+// narrows the Issues tab to that game. XENONLIVE_SET_EMAIL=<addr>
 // saves that recovery email from the account screen ("" removes it).
 // XENONLIVE_APPLY_UPDATE=1 applies whatever is staged in the self-update
 // directory as if the installer had just put it there, and quits;
@@ -159,6 +160,10 @@ int main(int, char**) {
     const char* issue_send = std::getenv("XENONLIVE_ISSUE_SEND");
     const char* issue_search = std::getenv("XENONLIVE_ISSUE_SEARCH");
     bool issue_fetch = std::getenv("XENONLIVE_ISSUE_FETCH") != nullptr;
+    if (const char* game = std::getenv("XENONLIVE_ISSUE_GAME")) {
+        uint32_t id = 0;
+        if (launcher::ParseTitleId(game, id)) app.issues.title_filter = id;
+    }
     bool issue_select_hit = false;
     const char* set_email = std::getenv("XENONLIVE_SET_EMAIL");
     // For a screenshot of the banner: pretend GitHub said this tag.

@@ -379,6 +379,30 @@ void DrawIssues(App& app) {
     ImGui::TextWrapped(app.developer() ? "Every report, newest first. Words search instead."
                                        : "Search before you send: yours may be known.");
     ImGui::PopStyleColor();
+    // Which game. The launcher's own titles are the choices; a report about
+    // a game not installed here still shows under "All games".
+    {
+        std::string current = "All games";
+        for (const auto& t : app.config.titles) {
+            if (t.title_id == st.title_filter && st.title_filter != 0) current = t.name;
+        }
+        ImGui::SetNextItemWidth(-1.0f);
+        if (ImGui::BeginCombo("##game", current.c_str())) {
+            const auto pick = [&](uint32_t id) {
+                if (st.title_filter == id) return;
+                st.title_filter = id;
+                st.searched = false;
+                if (st.search_ticket == 0) app.SearchIssues();
+                else st.refresh_after_search = true;
+            };
+            if (ImGui::Selectable("All games", st.title_filter == 0)) pick(0);
+            for (const auto& t : app.config.titles) {
+                if (t.title_id == 0) continue;
+                if (ImGui::Selectable(t.name.c_str(), st.title_filter == t.title_id)) pick(t.title_id);
+            }
+            ImGui::EndCombo();
+        }
+    }
     if (app.developer()) {
         // Which states to list. A change refetches at once.
         for (const auto& [label, value] :

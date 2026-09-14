@@ -781,8 +781,9 @@ void App::SearchIssues() {
     // mean a search, for everyone.
     const bool blank = std::string(issues.query).find_first_not_of(" \t\r\n") == std::string::npos;
     issues.dev_list = developer() && blank;
-    issues.search_ticket = issues.dev_list ? client->DevListIssues(issues.dev_filter, 100)
-                                           : client->SearchIssues(issues.query);
+    issues.search_ticket = issues.dev_list
+                               ? client->DevListIssues(issues.dev_filter, issues.title_filter, 100)
+                               : client->SearchIssues(issues.query, issues.title_filter);
 }
 
 void App::DeleteReport(int64_t id) {

@@ -224,6 +224,8 @@ public:
         // selected one is fetched in full — machine and files — and its
         // capture can be pulled to disk, under <home>/XenonLive/Player
         // Issues/, one folder per report.
+        // Which game the list and the search are about; 0 is every game.
+        uint32_t title_filter = 0;
         bool dev_list = false;      // results came from DevListIssues
         std::string dev_filter = "open";  // "", "open", "fixed", "closed"
         xlive::Client::Ticket detail_ticket = 0;
