@@ -12,6 +12,8 @@ class App;
 
 // "playing Dead Rising 2: Case West - Navigating the menus (joinable)".
 std::string PresenceLine(const xlive::Client::Presence& p);
+// Shows a directory in the desktop's file browser.
+void OpenFolder(const std::string& path);
 
 void DrawSignIn(App& app);
 void DrawHome(App& app);

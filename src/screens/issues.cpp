@@ -9,10 +9,13 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <filesystem>
 #include <string>
+#include <system_error>
 
 #include "app.h"
 #include "imgui.h"
+#include "json.h"
 #include "screens/screens.h"
 
 namespace launcher {
@@ -197,6 +200,110 @@ void DrawCaptureDetail(App& app, const Capture& c) {
     }
 }
 
+// The developer's view of one report: the words, then who and on what,
+// the capture (fetched to disk on request and shown from there), and the
+// state to set. Everything below the words comes from DevGetIssue, so it
+// arrives a moment after the row is picked.
+void DrawDeveloperDetail(App& app, const Issue& is) {
+    auto& st = app.issues;
+    const bool loaded = st.detail_for == is.id;
+    const Issue& full = loaded ? st.detail : is;
+    const std::filesystem::path dir = app.DevIssueDir(&full);
+
+    // Who and on what.
+    ImGui::Spacing();
+    xlive::theme::Section("Reported by");
+    if (!loaded) {
+        if (!st.detail_error.empty()) ImGui::TextColored(kRed, "%s", st.detail_error.c_str());
+        else ImGui::TextDisabled("Loading...");
+        return;
+    }
+    ImGui::TextUnformatted(full.gamertag.c_str());
+    ImGui::SameLine();
+    ImGui::TextDisabled("captured %s", full.captured_at.empty() ? "?" : When(full.captured_at).c_str());
+    if (!full.system_json.empty()) {
+        auto parsed = xlive::json::Parse(full.system_json);
+        if (parsed.ok && parsed.value.is_object()) {
+            ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
+            for (const auto& key : parsed.value.Keys()) {
+                const xlive::json::Value& v = parsed.value[key];
+                ImGui::Bullet();
+                ImGui::SameLine();
+                ImGui::TextWrapped("%s: %s", key.c_str(),
+                                   (v.is_string() ? v.AsString() : v.Serialize()).c_str());
+            }
+            ImGui::PopStyleColor();
+        }
+    }
+
+    // The capture.
+    ImGui::Spacing();
+    xlive::theme::Section("Capture");
+    std::error_code ec;
+    size_t on_disk = 0;
+    std::uintmax_t total = 0;
+    std::filesystem::path shot;
+    for (const auto& f : full.files) {
+        total += f.size;
+        const bool here = std::filesystem::is_regular_file(dir / f.name, ec);
+        if (here) ++on_disk;
+        if (here && shot.empty() && f.content_type.compare(0, 6, "image/") == 0) shot = dir / f.name;
+        ImGui::Bullet();
+        ImGui::SameLine();
+        if (here) ImGui::TextWrapped("%s (%s)", f.name.c_str(), Size(f.size).c_str());
+        else ImGui::TextDisabled("%s (%s) - not fetched", f.name.c_str(), Size(f.size).c_str());
+    }
+    if (full.files.empty()) ImGui::TextDisabled("no files");
+    if (!shot.empty()) {
+        const Image img = app.images.Local(shot);
+        if (img.texture) {
+            const float w = std::min(420.0f, ImGui::GetContentRegionAvail().x);
+            const float h = w * float(img.height) / float(std::max(1, img.width));
+            ImGui::Image(reinterpret_cast<ImTextureID>(img.texture), ImVec2(w, h));
+        }
+    }
+    const bool fetching = st.download_ticket != 0 && st.downloading == full.id;
+    ImGui::BeginDisabled(fetching || full.files.empty());
+    char label[96];
+    std::snprintf(label, sizeof(label), on_disk == full.files.size() ? "Fetch again (%s)" : "Fetch the capture (%s)",
+                  Size(total).c_str());
+    if (ImGui::Button(label, ImVec2(240.0f, 0.0f))) app.DevDownload(full);
+    ImGui::EndDisabled();
+    if (fetching) {
+        ImGui::SameLine();
+        ImGui::TextDisabled("Fetching, %zu to go...", st.download_queue.size() + 1);
+    } else if (on_disk > 0) {
+        ImGui::SameLine();
+        if (xlive::theme::SmallSecondaryButton("Open folder")) OpenFolder(dir.string());
+    }
+    if (!st.download_error.empty() && st.downloading == 0) {
+        ImGui::TextColored(kRed, "%s", st.download_error.c_str());
+    }
+    ImGui::TextDisabled("%s", dir.string().c_str());
+
+    // The state.
+    ImGui::Spacing();
+    xlive::theme::Section("State");
+    ImGui::BeginDisabled(st.state_ticket != 0);
+    for (const char* state : {"open", "fixed", "closed"}) {
+        const bool current = full.state == state;
+        if (current) ImGui::PushStyleColor(ImGuiCol_Button, StateColour(state));
+        else ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
+        if (ImGui::Button(state, ImVec2(100.0f, 0.0f)) && !current) app.DevSetState(full.id, state);
+        ImGui::PopStyleColor();
+        ImGui::SameLine();
+    }
+    ImGui::EndDisabled();
+    ImGui::NewLine();
+    ImGui::Spacing();
+    ImGui::BeginDisabled(st.delete_ticket != 0);
+    ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
+    ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kRed);
+    if (ImGui::Button("Delete this report")) app.DevDeleteReport(full.id);
+    ImGui::PopStyleColor(2);
+    ImGui::EndDisabled();
+}
+
 void DrawReportDetail(App& app, const Issue& is) {
     ImGui::PushFont(app.fonts.heading);
     ImGui::TextColored(kLime, "%s", is.title.c_str());
@@ -212,6 +319,10 @@ void DrawReportDetail(App& app, const Issue& is) {
     xlive::theme::Section("How to make it happen again");
     if (is.steps.empty()) ImGui::TextDisabled("not given");
     else ImGui::TextWrapped("%s", is.steps.c_str());
+    if (app.developer()) {
+        DrawDeveloperDetail(app, is);
+        return;
+    }
     if (is.mine) {
         ImGui::Spacing();
         ImGui::BeginDisabled(app.issues.delete_ticket != 0);
@@ -265,8 +376,27 @@ void DrawIssues(App& app) {
     ImGui::TextColored(kLime, "Reported");
     ImGui::PopFont();
     ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-    ImGui::TextWrapped("Search before you send: yours may be known.");
+    ImGui::TextWrapped(app.developer() ? "Every report, newest first. Words search instead."
+                                       : "Search before you send: yours may be known.");
     ImGui::PopStyleColor();
+    if (app.developer()) {
+        // Which states to list. A change refetches at once.
+        for (const auto& [label, value] :
+             {std::pair{"open", "open"}, std::pair{"fixed", "fixed"}, std::pair{"closed", "closed"},
+              std::pair{"all", ""}}) {
+            const bool current = st.dev_filter == value;
+            ImGui::PushStyleColor(ImGuiCol_Button, current ? kGreen : kPanelHi);
+            if (ImGui::SmallButton(label) && !current) {
+                st.dev_filter = value;
+                st.searched = false;
+                if (st.search_ticket == 0) app.SearchIssues();
+                else st.refresh_after_search = true;
+            }
+            ImGui::PopStyleColor();
+            ImGui::SameLine();
+        }
+        ImGui::NewLine();
+    }
     ImGui::SetNextItemWidth(-1.0f);
     const bool go = ImGui::InputTextWithHint("##q", "words to look for", st.query, sizeof(st.query),
                                              ImGuiInputTextFlags_EnterReturnsTrue);
@@ -284,13 +414,15 @@ void DrawIssues(App& app) {
     for (size_t i = 0; i < st.results.size(); ++i) {
         const Issue& is = st.results[i];
         const std::string sub = is.state + "   " + When(is.created_at).substr(0, 10) +
-                                (is.mine ? "   yours" : "");
+                                (is.mine ? "   yours" : "") +
+                                (is.gamertag.empty() ? "" : "   " + is.gamertag);
         char id[32];
         std::snprintf(id, sizeof(id), "r%lld", static_cast<long long>(is.id));
         const ImVec4 mark = StateColour(is.state);
         if (Row(app, id, is.title.c_str(), sub, st.selected_report == int(i), &mark)) {
             st.selected_report = int(i);
             st.selected_capture = -1;
+            if (app.developer() && st.detail_for != is.id) app.DevOpenReport(is.id);
         }
     }
     ImGui::EndChild();

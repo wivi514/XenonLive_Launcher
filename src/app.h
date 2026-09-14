@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <deque>
+#include <filesystem>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -217,6 +218,25 @@ public:
         std::string search_error;
         bool refresh_after_search = false;
         xlive::Client::Ticket delete_ticket = 0;
+        // -- the developer's side, for an account with identity().developer.
+        // With no words to search, the list is every report (filtered by
+        // state) rather than a search; each carries who sent it. The
+        // selected one is fetched in full — machine and files — and its
+        // capture can be pulled to disk, under <home>/XenonLive/Player
+        // Issues/, one folder per report.
+        bool dev_list = false;      // results came from DevListIssues
+        std::string dev_filter = "open";  // "", "open", "fixed", "closed"
+        xlive::Client::Ticket detail_ticket = 0;
+        int64_t detail_for = 0;     // which report `detail` describes
+        xlive::Client::Issue detail;
+        std::string detail_error;
+        xlive::Client::Ticket state_ticket = 0;
+        // Files still to fetch for the selected report, then the one in
+        // flight; the folder they go to.
+        std::vector<std::string> download_queue;
+        xlive::Client::Ticket download_ticket = 0;
+        int64_t downloading = 0;
+        std::string download_error;
     } issues;
     // -- the account screen ------------------------------------------------
     // The few things a player may change about themselves: the recovery
@@ -247,6 +267,16 @@ public:
     void DeleteCapture();
     void SearchIssues();
     void DeleteReport(int64_t id);
+    // The developer's side. Each is a no-op for a player account: the
+    // server refuses anyway, but the buttons are not drawn either.
+    bool developer() const;
+    void DevOpenReport(int64_t id);
+    void DevSetState(int64_t id, const std::string& state);
+    void DevDownload(const xlive::Client::Issue& is);
+    void DevDeleteReport(int64_t id);
+    // Where a report's capture is kept once fetched; the folder of the
+    // developer's reports as a whole when `is` is null.
+    std::filesystem::path DevIssueDir(const xlive::Client::Issue* is) const;
 
     // Records a ticket to be collected. `what` names the action for the
     // failure toast ("Add friend", "Send invite").

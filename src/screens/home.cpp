@@ -14,6 +14,14 @@
 
 namespace launcher {
 
+void OpenFolder(const std::string& path) {
+#ifdef _WIN32
+    SDL_OpenURL(("file:///" + path).c_str());
+#else
+    SDL_OpenURL(("file://" + path).c_str());
+#endif
+}
+
 namespace {
 
 using xlive::theme::kAmber;
@@ -25,14 +33,6 @@ std::string Megabytes(uint64_t bytes) {
     char buf[32];
     std::snprintf(buf, sizeof(buf), "%.1f MB", double(bytes) / (1024.0 * 1024.0));
     return buf;
-}
-
-void OpenFolder(const std::string& path) {
-#ifdef _WIN32
-    SDL_OpenURL(("file:///" + path).c_str());
-#else
-    SDL_OpenURL(("file://" + path).c_str());
-#endif
 }
 
 // The card for one catalog game.

@@ -37,7 +37,9 @@ namespace {
 // has a new password mailed for that account. XENONLIVE_CAPTURE=<n>
 // selects the n-th capture on the Issues tab; XENONLIVE_ISSUE_SEND="title|what
 // happened|steps" fills the form and sends it; XENONLIVE_ISSUE_SEARCH=<words>
-// searches the reports and selects the first hit. XENONLIVE_SET_EMAIL=<addr>
+// searches the reports and selects the first hit (a blank one lists them, as
+// a developer sees them), and XENONLIVE_ISSUE_FETCH=1 then fetches the
+// selected report's capture as a developer. XENONLIVE_SET_EMAIL=<addr>
 // saves that recovery email from the account screen ("" removes it).
 // XENONLIVE_APPLY_UPDATE=1 applies whatever is staged in the self-update
 // directory as if the installer had just put it there, and quits;
@@ -156,6 +158,7 @@ int main(int, char**) {
     const char* capture_index = std::getenv("XENONLIVE_CAPTURE");
     const char* issue_send = std::getenv("XENONLIVE_ISSUE_SEND");
     const char* issue_search = std::getenv("XENONLIVE_ISSUE_SEARCH");
+    bool issue_fetch = std::getenv("XENONLIVE_ISSUE_FETCH") != nullptr;
     bool issue_select_hit = false;
     const char* set_email = std::getenv("XENONLIVE_SET_EMAIL");
     // For a screenshot of the banner: pretend GitHub said this tag.
@@ -253,8 +256,14 @@ int main(int, char**) {
             if (!app.issues.results.empty()) {
                 app.issues.selected_report = 0;
                 app.issues.selected_capture = -1;
+                if (app.developer()) app.DevOpenReport(app.issues.results[0].id);
             }
             issue_select_hit = false;
+        }
+        if (issue_fetch && app.developer() && app.issues.selected_report >= 0 &&
+            app.issues.detail_for != 0 && app.issues.detail_ticket == 0) {
+            app.DevDownload(app.issues.detail);
+            issue_fetch = false;
         }
         if (install_key && app.signed_in()) {
             if (const launcher::CatalogGame* game = launcher::CatalogByKey(install_key)) {

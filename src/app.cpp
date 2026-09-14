@@ -3,6 +3,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 
 #include "imgui.h"
 #include "paths.h"
@@ -459,9 +460,74 @@ void App::PollPending() {
             issues.delete_ticket = 0;
             if (status == xlive::Client::OpStatus::Succeeded) {
                 toasts.Push("Report deleted", 4.0);
+                issues.detail_for = 0;
                 SearchIssues();
             } else {
                 toasts.Push("Could not delete the report: " + result.error, 6.0);
+            }
+        }
+    }
+    if (issues.detail_ticket != 0) {
+        xlive::Client::IssueResult result;
+        const auto status = client->Poll(issues.detail_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            issues.detail_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                issues.detail = std::move(result.issue);
+                issues.detail_for = issues.detail.id;
+                issues.detail_error.clear();
+            } else {
+                issues.detail_error = result.error == "not_developer"
+                                          ? "This account is no longer a developer"
+                                          : result.error;
+            }
+        }
+    }
+    if (issues.state_ticket != 0) {
+        xlive::Client::IssueResult result;
+        const auto status = client->Poll(issues.state_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            issues.state_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                // The list on the left and the detail both say the new
+                // state at once; the list is refetched so a filter that no
+                // longer matches drops it.
+                for (auto& is : issues.results) {
+                    if (is.id == issues.detail.id) is.state = issues.detail.state;
+                }
+                if (issues.dev_list) issues.refresh_after_search = true;
+                if (issues.search_ticket == 0 && issues.refresh_after_search) {
+                    issues.refresh_after_search = false;
+                    const int64_t keep = issues.detail_for;
+                    SearchIssues();
+                    issues.detail_for = keep;
+                }
+            } else {
+                toasts.Push("Could not change the state: " + result.error, 6.0);
+                if (issues.detail_for != 0) DevOpenReport(issues.detail_for);
+            }
+        }
+    }
+    if (issues.download_ticket != 0) {
+        xlive::Client::IssueResult result;
+        const auto status = client->Poll(issues.download_ticket, result);
+        if (status != xlive::Client::OpStatus::Pending) {
+            issues.download_ticket = 0;
+            if (status == xlive::Client::OpStatus::Succeeded) {
+                // Next file, if any.
+                if (!issues.download_queue.empty() && issues.detail_for == issues.downloading) {
+                    const std::string name = issues.download_queue.front();
+                    issues.download_queue.erase(issues.download_queue.begin());
+                    issues.download_ticket = client->DevSaveIssueFile(
+                        issues.downloading, name, (DevIssueDir(&issues.detail) / name).string());
+                } else {
+                    issues.download_queue.clear();
+                    issues.downloading = 0;
+                }
+            } else {
+                issues.download_error = "Could not fetch " + result.failed_file + ": " + result.error;
+                issues.download_queue.clear();
+                issues.downloading = 0;
             }
         }
     }
@@ -710,12 +776,102 @@ void App::DeleteCapture() {
 void App::SearchIssues() {
     if (!client || !signed_in() || issues.search_ticket != 0) return;
     issues.searched_for = issues.query;
-    issues.search_ticket = client->SearchIssues(issues.query);
+    // A developer with nothing to search for gets every report, newest
+    // first, filtered by state — the queue to work through. Words always
+    // mean a search, for everyone.
+    const bool blank = std::string(issues.query).find_first_not_of(" \t\r\n") == std::string::npos;
+    issues.dev_list = developer() && blank;
+    issues.search_ticket = issues.dev_list ? client->DevListIssues(issues.dev_filter, 100)
+                                           : client->SearchIssues(issues.query);
 }
 
 void App::DeleteReport(int64_t id) {
     if (!client || issues.delete_ticket != 0) return;
     issues.delete_ticket = client->DeleteIssue(id);
+}
+
+// -- the developer's side --------------------------------------------------
+
+bool App::developer() const { return client && signed_in() && client->identity().developer; }
+
+void App::DevOpenReport(int64_t id) {
+    if (!developer() || issues.detail_ticket != 0) return;
+    issues.detail_error.clear();
+    issues.detail_ticket = client->DevGetIssue(id);
+}
+
+void App::DevSetState(int64_t id, const std::string& state) {
+    if (!developer() || issues.state_ticket != 0) return;
+    if (issues.detail_for == id) issues.detail.state = state;
+    issues.state_ticket = client->DevSetIssueState(id, state);
+}
+
+void App::DevDeleteReport(int64_t id) {
+    if (!developer() || issues.delete_ticket != 0) return;
+    issues.delete_ticket = client->DevDeleteIssue(id);
+}
+
+std::filesystem::path App::DevIssueDir(const xlive::Client::Issue* is) const {
+    std::filesystem::path root;
+#ifdef _WIN32
+    if (const std::string home = xlive::Env("USERPROFILE"); !home.empty()) root = home;
+#else
+    if (const std::string home = xlive::Env("HOME"); !home.empty()) root = home;
+#endif
+    if (root.empty()) root = std::filesystem::current_path();
+    root = root / "XenonLive" / "Player Issues";
+    if (!is) return root;
+    // "#7 - Case Zero - pokisal": a name that reads on its own in a file
+    // browser. Characters a filesystem refuses are swapped out.
+    std::string game_name;
+    for (const auto& t : config.titles) {
+        if (t.title_id == is->title_id && !t.name.empty()) game_name = t.name;
+    }
+    if (game_name.empty()) {
+        char buf[16];
+        std::snprintf(buf, sizeof(buf), "%08x", is->title_id);
+        game_name = buf;
+    }
+    std::string name = "#" + std::to_string(is->id) + " - " + game_name + " - " + is->gamertag;
+    for (char& c : name) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' ||
+            c == '>' || c == '|') {
+            c = '_';
+        }
+    }
+    return root / name;
+}
+
+void App::DevDownload(const xlive::Client::Issue& is) {
+    if (!developer() || issues.download_ticket != 0 || is.id == 0) return;
+    const std::filesystem::path dir = DevIssueDir(&is);
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    if (ec) {
+        issues.download_error = "Cannot create " + dir.string();
+        return;
+    }
+    // The words and the machine go in beside the files, so the folder is
+    // the whole report without the launcher.
+    {
+        std::ofstream out(dir / "issue.txt", std::ios::binary | std::ios::trunc);
+        out << "Issue #" << is.id << "\n"
+            << "Game: " << dir.filename().string() << " " << is.game_version << "\n"
+            << "Reporter: " << is.gamertag << "\n"
+            << "State: " << is.state << "\n"
+            << "Filed: " << is.created_at << "\n"
+            << "Captured: " << is.captured_at << "\n\n"
+            << "TITLE: " << is.title << "\n\nSUMMARY:\n" << is.summary << "\n\nSTEPS:\n" << is.steps
+            << "\n\nSYSTEM:\n" << is.system_json << "\n";
+    }
+    issues.download_error.clear();
+    issues.download_queue.clear();
+    for (const auto& f : is.files) issues.download_queue.push_back(f.name);
+    if (issues.download_queue.empty()) return;
+    issues.downloading = is.id;
+    const std::string first = issues.download_queue.front();
+    issues.download_queue.erase(issues.download_queue.begin());
+    issues.download_ticket = client->DevSaveIssueFile(is.id, first, (dir / first).string());
 }
 
 // -- invites ------------------------------------------------------------------
