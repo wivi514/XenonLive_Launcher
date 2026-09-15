@@ -282,7 +282,12 @@ in. A system CJK font, when found, is merged behind it into the body face
 for what friends type. Overrides: `<data dir>/launcher/lang/<code>.tsv`
 with `key<TAB>translation` lines, loaded at start.
 
-Headless: `"language": "fr"` in `launcher.json` (empty = system).
+The overlay uses the same table: `XLIVE_LANGUAGE=<code>` in the game's
+environment (the launcher sets it for the games it starts), else
+`"language"` in `launcher.json` in the data directory, else the system's.
+
+Headless: `"language": "fr"` in `launcher.json` (empty = system);
+`XLIVE_LANGUAGE=ja` for the overlay.
 
 ## Driving it from a shell
 

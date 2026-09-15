@@ -947,6 +947,8 @@ bool App::Launch(int title_index, std::string& error) {
     }
     std::map<std::string, std::string> env = entry.env;
     if (config.allow_insecure) env["XLIVE_ALLOW_INSECURE"] = "1";
+    // The overlay speaks the launcher's language.
+    env["XLIVE_LANGUAGE"] = xlive::i18n::Info(xlive::i18n::Current()).code;
 #ifndef _WIN32
     // An AppImage mounts itself with FUSE. Without /dev/fuse the type-2
     // runtime can extract itself to a temporary directory and run from there

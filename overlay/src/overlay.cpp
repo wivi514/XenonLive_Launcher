@@ -19,6 +19,7 @@
 #include <xlive/client.h>
 
 #include "imgui.h"
+#include "i18n.h"
 #include "presence_announcer.h"
 #include "theme.h"
 #include "imgui_impl_vulkan.h"
@@ -46,6 +47,7 @@ using Client = xlive::Client;
 const ImVec4& kGreen = xlive::theme::kLime;
 const ImVec4& kAmber = xlive::theme::kAmber;
 const ImVec4& kDim = xlive::theme::kMuted;
+using xlive::i18n::T;
 
 struct Toast {
     std::string text;
@@ -69,12 +71,12 @@ struct PendingSocial {
 
 std::string PresenceLine(const Client::Presence& p) {
     switch (p.state) {
-        case Client::PresenceState::Offline: return "offline";
-        case Client::PresenceState::Online:  return "online";
+        case Client::PresenceState::Offline: return T("offline");
+        case Client::PresenceState::Online:  return T("online");
         case Client::PresenceState::Playing: {
-            std::string line = "playing " + (p.title_name.empty() ? "a game" : p.title_name);
+            std::string line = T("playing ") + (p.title_name.empty() ? T("a game") : p.title_name);
             if (!p.rich_text.empty() && p.rich_text != p.title_name) line += " - " + p.rich_text;
-            if (p.joinable) line += " (joinable)";
+            if (p.joinable) line += T(" (joinable)");
             return line;
         }
     }
@@ -201,6 +203,9 @@ struct Overlay::Impl {
     // ("Invitation sent", "Message not sent") is answered regardless.
     bool notifications = true;
     bool settings_loaded = false;
+    // The client at Init time, for the language (launcher.json lives in
+    // its data directory).
+    Client* client_for_init = nullptr;
     std::filesystem::path settings_path;
     void LoadSettings(Client& c);
     void SaveSettings();
@@ -342,7 +347,36 @@ void Overlay::Impl::Init(const VulkanHandles& h) {
     // ImGui_ImplVulkan_NewFrame, which is the first frame with something to
     // draw — a queue submit and a wait, once, when the first toast appears.
     xlive::theme::Apply(ImGui::GetStyle(), 1.0f, 0.94f);
-    fonts = xlive::theme::LoadFonts(io, 20.0f);
+    // The launcher's language: XLIVE_LANGUAGE in the environment (the
+    // launcher sets it for the games it starts), else launcher.json in the
+    // data directory (a game started by hand), else the system's. Japanese
+    // and Korean draw from the subset compiled in; a system CJK font, when
+    // there is one, covers what friends type.
+    {
+        namespace i18n = xlive::i18n;
+        i18n::Lang lang = i18n::Lang::En;
+        bool chosen = false;
+        if (const char* env = std::getenv("XLIVE_LANGUAGE"); env && *env) {
+            lang = i18n::FromCode(env);
+            chosen = true;
+        } else if (client_for_init) {
+            std::ifstream in(std::filesystem::path(client_for_init->data_dir()) / "launcher.json");
+            const std::string text((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
+            if (const auto at = text.find("\"language\""); at != std::string::npos) {
+                const auto open = text.find('"', text.find(':', at) + 1);
+                const auto close = open == std::string::npos ? open : text.find('"', open + 1);
+                if (close != std::string::npos) {
+                    lang = i18n::FromCode(text.substr(open + 1, close - open - 1));
+                    chosen = true;
+                }
+            }
+        }
+        if (!chosen) lang = i18n::FromSystem();
+        i18n::Set(lang);
+        const std::string cjk = i18n::Info(lang).cjk ? i18n::FindCjkFont(lang) : std::string();
+        fonts = xlive::theme::LoadFonts(io, 20.0f, nullptr, cjk.empty() ? nullptr : cjk.c_str(),
+                                        i18n::Info(lang).cjk ? i18n::Info(lang).code : nullptr);
+    }
 
     ImGui_ImplVulkan_InitInfo info{};
     info.ApiVersion = h.api_version;
@@ -701,7 +735,7 @@ void Overlay::Impl::DrainEvents(Client& c) {
                     }
                     break;
                 }
-                t.text = "Achievement unlocked: " + t.name;
+                t.text = T("Achievement unlocked: ") + t.name;
                 t.expires_at = Now() + 9.0;
                 if (notifications) {
                     toasts.push_back(std::move(t));
@@ -710,10 +744,10 @@ void Overlay::Impl::DrainEvents(Client& c) {
                 break;
             }
             case xlive::EventKind::InviteReceived:
-                Push(event.gamertag + " invited you to play - Shift+Tab to answer", 12.0);
+                Push(event.gamertag + T(" invited you to play - Shift+Tab to answer"), 12.0);
                 break;
             case xlive::EventKind::InviteAccepted:
-                Push("Joining " + event.gamertag + "'s game", 6.0);
+                Push(T("Joining ") + event.gamertag + T("'s game"), 6.0);
                 break;
             case xlive::EventKind::MessageReceived:
                 if (open.load() && peer == event.xuid) {
@@ -722,20 +756,20 @@ void Overlay::Impl::DrainEvents(Client& c) {
                     unread[event.xuid] += 1;
                 }
                 if (open.load() && !inbox_ticket) inbox_ticket = c.LoadConversations();
-                Push(event.gamertag + ": " + event.message + "  -  Shift+Tab to reply", 10.0);
+                Push(event.gamertag + ": " + event.message + T("  -  Shift+Tab to reply"), 10.0);
                 break;
             case xlive::EventKind::InviteAnswered:
-                Push(event.gamertag + (event.accepted ? " accepted" : " declined") +
-                     " your invitation");
+                Push(event.gamertag + (event.accepted ? T(" accepted") : T(" declined")) +
+                     T(" your invitation"));
                 break;
             case xlive::EventKind::SigninChanged:
                 // Signing in is not news over a game the launcher just
                 // started as that account; the panel's header says who.
                 // Being signed OUT mid-game is.
-                if (!c.identity().online()) Push("Signed out of XenonLive");
+                if (!c.identity().online()) Push(T("Signed out of XenonLive"));
                 break;
             case xlive::EventKind::ConnectionChanged:
-                if (!c.online()) Push("XenonLive connection lost; retrying");
+                if (!c.online()) Push(T("XenonLive connection lost; retrying"));
                 break;
             case xlive::EventKind::FriendsChanged: {
                 const auto now = c.friends();
@@ -747,7 +781,7 @@ void Overlay::Impl::DrainEvents(Client& c) {
                         }
                         if (f.relation == Client::Relation::RequestReceived &&
                             (!was || was->relation != Client::Relation::RequestReceived)) {
-                            Push(f.gamertag + " wants to be your friend");
+                            Push(f.gamertag + T(" wants to be your friend"));
                         }
                     }
                 }
@@ -770,7 +804,7 @@ void Overlay::Impl::PollTickets(Client& c) {
             ++i;
             continue;
         }
-        if (status == Client::OpStatus::Failed) Push(pending[i].what + " failed: " + result.error, 5.0, true);
+        if (status == Client::OpStatus::Failed) Push(pending[i].what + T(" failed: ") + result.error, 5.0, true);
         pending.erase(pending.begin() + long(i));
     }
     if (presence_ticket) {
@@ -820,7 +854,7 @@ void Overlay::Impl::PollTickets(Client& c) {
                 }
                 if (!inbox_ticket) inbox_ticket = c.LoadConversations();
             } else {
-                Push("Message not sent: " + result.error, 5.0, true);
+                Push(T("Message not sent: ") + result.error, 5.0, true);
             }
         }
     }
@@ -954,7 +988,7 @@ void Overlay::Impl::DrawToasts(uint32_t width, uint32_t height) {
                 }
                 ImGui::SameLine();
                 ImGui::BeginGroup();
-                ImGui::TextColored(xlive::theme::kLime, "Achievement unlocked");
+                ImGui::TextColored(xlive::theme::kLime, T("Achievement unlocked"));
                 ImGui::PushFont(fonts.heading);
                 ImGui::TextUnformatted(t.name.c_str());
                 ImGui::PopFont();
@@ -965,7 +999,7 @@ void Overlay::Impl::DrawToasts(uint32_t width, uint32_t height) {
                     ImGui::SameLine();
                     const float drop = fonts.heading->Ascent - ImGui::GetFont()->Ascent;
                     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + drop);
-                    ImGui::TextDisabled("%u G", t.score);
+                    ImGui::TextDisabled(T("%u G"), t.score);
                 }
                 if (!t.description.empty()) {
                     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + 330.0f * scale);
@@ -1010,17 +1044,23 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
     ImGui::Text("%s", id.gamertag.c_str());
     ImGui::PopFont();
     ImGui::SameLine();
-    ImGui::TextColored(c.online() ? kGreen : kAmber, c.online() ? "online" : "offline");
-    const char* hint = "Shift+Tab / View+Menu closes  -  LB RB tabs, B back";
-    const float toggle_w = ImGui::CalcTextSize("Notifications").x + ImGui::GetFrameHeight() + 8.0f * scale;
-    ImGui::SameLine(size.x - ImGui::CalcTextSize(hint).x - toggle_w - 20.0f * scale -
-                    ImGui::GetStyle().WindowPadding.x);
-    ImGui::TextDisabled("%s", hint);
+    ImGui::TextColored(c.online() ? kGreen : kAmber, c.online() ? T("online") : T("offline"));
+    const char* hint = T("Shift+Tab / View+Menu closes  -  LB RB tabs, B back");
+    const float toggle_w = ImGui::CalcTextSize(T("Notifications")).x + ImGui::GetFrameHeight() + 8.0f * scale;
+    // The hint sits between the name and the switch when it fits — a
+    // language's longer wording, or a long gamertag, drops it rather than
+    // overprint the name.
+    const float hint_x = size.x - ImGui::CalcTextSize(hint).x - toggle_w - 20.0f * scale -
+                         ImGui::GetStyle().WindowPadding.x;
+    const float name_end = ImGui::GetItemRectMax().x - ImGui::GetWindowPos().x;
+    if (hint_x > name_end + 24.0f * scale) {
+        ImGui::SameLine(hint_x);
+        ImGui::TextDisabled("%s", hint);
+    }
     ImGui::SameLine(size.x - toggle_w - ImGui::GetStyle().WindowPadding.x);
-    if (ImGui::Checkbox("Notifications", &notifications)) SaveSettings();
+    if (ImGui::Checkbox(T("Notifications"), &notifications)) SaveSettings();
     if (ImGui::IsItemHovered()) {
-        ImGui::SetTooltip("Off: nothing pops up over the game. Invitations and messages still\n"
-                          "wait here, with a count on their tab.");
+        ImGui::SetTooltip(T("Off: nothing pops up over the game. Invitations and messages still\nwait here, with a count on their tab."));
     }
     ImGui::Separator();
 
@@ -1048,32 +1088,32 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
     };
 
     if (ImGui::BeginTabBar("tabs")) {
-        if (ImGui::BeginTabItem("Friends", nullptr, tab_flags(0))) {
+        if (ImGui::BeginTabItem(T("Friends"), nullptr, tab_flags(0))) {
             current_tab = 0;
             const bool can_invite = mine_loaded && mine.session_id != 0;
             if (presence_ticket) {
-                ImGui::TextDisabled("reading your session...");
+                ImGui::TextDisabled(T("reading your session..."));
             } else if (can_invite) {
-                ImGui::TextDisabled("in a session: friends can be invited");
+                ImGui::TextDisabled(T("in a session: friends can be invited"));
             } else {
-                ImGui::TextDisabled("not in a joinable session yet");
+                ImGui::TextDisabled(T("not in a joinable session yet"));
             }
             ImGui::SameLine(size.x - 110.0f * scale);
-            if (ImGui::SmallButton("Refresh")) {
+            if (ImGui::SmallButton(T("Refresh"))) {
                 Issue(c.RefreshFriends(), "Refresh");
                 if (!presence_ticket) presence_ticket = c.LoadMyPresence();
             }
             // Add by gamertag, as on the launcher's Friends tab. Asking
             // someone who has asked you IS accepting, so one box does both.
             ImGui::SetNextItemWidth(220.0f * scale);
-            const bool add_enter = ImGui::InputTextWithHint("##add", "gamertag", add_gamertag,
+            const bool add_enter = ImGui::InputTextWithHint("##add", T("gamertag"), add_gamertag,
                                                             sizeof(add_gamertag),
                                                             ImGuiInputTextFlags_EnterReturnsTrue);
             ImGui::SameLine();
-            if ((ImGui::SmallButton("Add friend") || add_enter) && add_gamertag[0] != '\0') {
+            if ((ImGui::SmallButton(T("Add friend")) || add_enter) && add_gamertag[0] != '\0') {
                 const std::string tag = add_gamertag;
-                Issue(c.AddFriendByGamertag(tag), "Add " + tag);
-                Push("Friend request sent to " + tag, 5.0, true);
+                Issue(c.AddFriendByGamertag(tag), T("Add ") + tag);
+                Push(T("Friend request sent to ") + tag, 5.0, true);
                 std::memset(add_gamertag, 0, sizeof(add_gamertag));
             }
             ImGui::BeginChild("friends", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
@@ -1093,9 +1133,9 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                     ImGui::SameLine(ImGui::GetContentRegionAvail().x - 60.0f * scale +
                                     ImGui::GetCursorPosX());
                     ImGui::BeginDisabled(!can_invite || !f.presence.online());
-                    if (ImGui::SmallButton("Invite")) {
-                        Issue(c.SendInvite(mine.session_id, f.xuid), "Invite " + f.gamertag);
-                        Push("Invitation sent to " + f.gamertag, 5.0, true);
+                    if (ImGui::SmallButton(T("Invite"))) {
+                        Issue(c.SendInvite(mine.session_id, f.xuid), T("Invite ") + f.gamertag);
+                        Push(T("Invitation sent to ") + f.gamertag, 5.0, true);
                     }
                     ImGui::EndDisabled();
                     ImGui::EndChild();
@@ -1111,15 +1151,15 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
                 ImGui::BeginChild("req", ImVec2(0, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
                 ImGui::Text("%s", f.gamertag.c_str());
                 ImGui::SameLine();
-                ImGui::TextDisabled("wants to be your friend");
-                if (ImGui::SmallButton("Accept")) Issue(c.AddFriend(f.xuid), "Accept " + f.gamertag);
+                ImGui::TextDisabled(T("wants to be your friend"));
+                if (ImGui::SmallButton(T("Accept"))) Issue(c.AddFriend(f.xuid), T("Accept ") + f.gamertag);
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Decline")) Issue(c.RemoveFriend(f.xuid), "Decline " + f.gamertag);
+                if (ImGui::SmallButton(T("Decline"))) Issue(c.RemoveFriend(f.xuid), T("Decline ") + f.gamertag);
                 ImGui::EndChild();
                 ImGui::PopID();
                 ImGui::PopID();
             }
-            if (!any) ImGui::TextDisabled("No friends yet. Type a gamertag above to add one.");
+            if (!any) ImGui::TextDisabled(T("No friends yet. Type a gamertag above to add one."));
             ImGui::EndChild();
             ImGui::EndTabItem();
         }
@@ -1129,29 +1169,29 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
         // changes; without it a new count is a new tab, and the selection
         // jumps back to the first one.
         const std::string invites_label =
-            (invites.empty() ? "Invites" : "Invites (" + std::to_string(invites.size()) + ")") + "###invites";
+            (invites.empty() ? std::string(T("Invites")) : T("Invites (") + std::to_string(invites.size()) + ")") + "###invites";
         if (ImGui::BeginTabItem(invites_label.c_str(), nullptr, tab_flags(1))) {
             current_tab = 1;
             ImGui::SameLine(size.x - 110.0f * scale);
             ImGui::BeginDisabled(refresh_ticket != 0);
-            if (ImGui::SmallButton("Refresh")) refresh_ticket = c.RefreshInvites();
+            if (ImGui::SmallButton(T("Refresh"))) refresh_ticket = c.RefreshInvites();
             ImGui::EndDisabled();
             ImGui::BeginChild("invites", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
-            if (invites.empty()) ImGui::TextDisabled("Nothing waiting.");
+            if (invites.empty()) ImGui::TextDisabled(T("Nothing waiting."));
             for (const Client::Invite& invite : invites) {
                 ImGui::PushID(int(invite.id));
                 ImGui::BeginChild("inv", ImVec2(0, 0), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
                 ImGui::Text("%s", invite.from_gamertag.c_str());
                 ImGui::SameLine();
-                ImGui::TextDisabled("invited you to their game");
+                ImGui::TextDisabled(T("invited you to their game"));
                 // Accepting tells the server, which tells THIS game (invite_taken):
                 // the port then joins, exactly as if the launcher had accepted.
-                if (ImGui::SmallButton("Accept")) {
+                if (ImGui::SmallButton(T("Accept"))) {
                     Issue(c.AcceptInvite(invite.id), "Accept");
                     open.store(false);
                 }
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Decline")) Issue(c.DeclineInvite(invite.id), "Decline");
+                if (ImGui::SmallButton(T("Decline"))) Issue(c.DeclineInvite(invite.id), "Decline");
                 ImGui::EndChild();
                 ImGui::PopID();
             }
@@ -1161,13 +1201,13 @@ void Overlay::Impl::DrawPanel(Client& c, uint32_t width, uint32_t height) {
         int unread_total = 0;
         for (const auto& [xuid, n] : unread) unread_total += n;
         const std::string messages_label =
-            (unread_total ? "Messages (" + std::to_string(unread_total) + ")" : "Messages") + "###messages";
+            (unread_total ? T("Messages (") + std::to_string(unread_total) + ")" : std::string(T("Messages"))) + "###messages";
         if (ImGui::BeginTabItem(messages_label.c_str(), nullptr, tab_flags(2))) {
             current_tab = 2;
             DrawMessages(c, size.x);
             ImGui::EndTabItem();
         }
-        if (ImGui::BeginTabItem("Achievements", nullptr, tab_flags(3))) {
+        if (ImGui::BeginTabItem(T("Achievements"), nullptr, tab_flags(3))) {
             current_tab = 3;
             DrawAchievements(c, size.x);
             ImGui::EndTabItem();
@@ -1210,7 +1250,7 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
         if (ImGui::Selectable(label.c_str(), peer == xuid)) OpenConversation(c, xuid, name);
         if (latest) {
             ImGui::PushTextWrapPos(0.0f);
-            ImGui::TextDisabled("%s%s", latest->from_xuid == xuid ? "" : "You: ",
+            ImGui::TextDisabled("%s%s", latest->from_xuid == xuid ? "" : T("You: "),
                                 latest->body.substr(0, 40).c_str());
             ImGui::PopTextWrapPos();
         }
@@ -1227,7 +1267,7 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
         if (std::find(listed.begin(), listed.end(), f.xuid) != listed.end()) continue;
         person(f.xuid, f.gamertag, nullptr);
     }
-    if (listed.empty() && friends.empty()) ImGui::TextDisabled("No friends yet.");
+    if (listed.empty() && friends.empty()) ImGui::TextDisabled(T("No friends yet."));
     ImGui::EndChild();
     ImGui::SameLine();
 
@@ -1243,8 +1283,8 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
 
     ImGui::BeginGroup();
     if (peer == 0) {
-        ImGui::TextDisabled("Pick someone. A message is up to 256 characters;");
-        ImGui::TextDisabled("the last 20 between you are kept.");
+        ImGui::TextDisabled(T("Pick someone. A message is up to 256 characters;"));
+        ImGui::TextDisabled(T("the last 20 between you are kept."));
         ImGui::EndGroup();
         return;
     }
@@ -1258,12 +1298,12 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
     }
     const float input_h = ImGui::GetFrameHeight() * 2.0f + ImGui::GetStyle().ItemSpacing.y * 2.0f;
     ImGui::BeginChild("log", ImVec2(0, ImGui::GetContentRegionAvail().y - input_h), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
-    if (conversation.empty() && !conversation_ticket) ImGui::TextDisabled("No messages yet.");
+    if (conversation.empty() && !conversation_ticket) ImGui::TextDisabled(T("No messages yet."));
     for (const Client::Message& msg : conversation) {
         const bool from_me = msg.from_xuid == me;
         ImGui::PushID(int(msg.id));
         ImGui::TextColored(from_me ? kGreen : ImVec4(0.75f, 0.8f, 0.9f, 1.0f), "%s",
-                           from_me ? "You" : msg.from_gamertag.c_str());
+                           from_me ? T("You") : msg.from_gamertag.c_str());
         if (msg.sent_at.size() >= 16) {
             ImGui::SameLine();
             ImGui::TextDisabled("%s %s", msg.sent_at.substr(5, 5).c_str(), msg.sent_at.substr(11, 5).c_str());
@@ -1290,24 +1330,24 @@ void Overlay::Impl::DrawMessages(Client& c, float width) {
         focus_draft = false;
     }
     ImGui::SetNextItemWidth(-90.0f * scale);
-    const bool enter = ImGui::InputTextWithHint("##draft", "write a message, Enter sends", draft,
+    const bool enter = ImGui::InputTextWithHint("##draft", T("write a message, Enter sends"), draft,
                                                 sizeof(draft), ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
     ImGui::BeginDisabled(over || draft[0] == '\0');
-    if ((ImGui::Button("Send", ImVec2(-1.0f, 0.0f)) || enter) && !over && draft[0] != '\0') {
+    if ((ImGui::Button(T("Send"), ImVec2(-1.0f, 0.0f)) || enter) && !over && draft[0] != '\0') {
         send_ticket = c.SendMessage(peer, draft);
     }
     ImGui::EndDisabled();
     ImGui::EndDisabled();
-    ImGui::TextColored(over ? kAmber : kDim, "%zu / %zu%s", length, Client::kMaxMessageLength,
-                       f && f->is_friend() ? "" : "  -  not a friend any more; you can read, not write");
+    ImGui::TextColored(over ? kAmber : kDim, T("%zu / %zu%s"), length, Client::kMaxMessageLength,
+                       f && f->is_friend() ? "" : T("  -  not a friend any more; you can read, not write"));
     ImGui::EndGroup();
 }
 
 void Overlay::Impl::DrawAchievements(Client& c, float width) {
     const uint32_t id = title_id.load();
     if (id == 0) {
-        ImGui::TextDisabled("No title.");
+        ImGui::TextDisabled(T("No title."));
         return;
     }
     // Read once per opening, and again after an unlock; never per frame.
@@ -1317,15 +1357,15 @@ void Overlay::Impl::DrawAchievements(Client& c, float width) {
     }
     ImGui::SameLine(width - 110.0f * scale);
     ImGui::BeginDisabled(title_ticket != 0);
-    if (ImGui::SmallButton("Refresh")) title_stale = true;
+    if (ImGui::SmallButton(T("Refresh"))) title_stale = true;
     ImGui::EndDisabled();
 
     if (!title_loaded) {
         if (title_ticket) {
-            ImGui::TextDisabled("loading...");
+            ImGui::TextDisabled(T("loading..."));
         } else if (!title_error.empty()) {
             ImGui::TextDisabled("%s", title_error.c_str());
-            if (title_error == "no_title") ImGui::TextDisabled("This server has not imported the title.");
+            if (title_error == "no_title") ImGui::TextDisabled(T("This server has not imported the title."));
         }
         return;
     }
@@ -1336,9 +1376,9 @@ void Overlay::Impl::DrawAchievements(Client& c, float width) {
     // whether or not the queue has drained.
     unsigned unlocked_count = 0;
     for (const auto& a : info.achievements) unlocked_count += a.unlocked || c.IsUnlocked(a.id);
-    ImGui::Text("%u of %zu unlocked", unlocked_count, info.achievements.size());
+    ImGui::Text(T("%u of %zu unlocked"), unlocked_count, info.achievements.size());
     ImGui::SameLine();
-    ImGui::TextDisabled("%u / %u G", c.title_gamerscore(), info.max_gamerscore);
+    ImGui::TextDisabled(T("%u / %u G"), c.title_gamerscore(), info.max_gamerscore);
     ImGui::Separator();
 
     ImGui::BeginChild("achievements", ImVec2(0, 0), ImGuiChildFlags_NavFlattened);
@@ -1363,17 +1403,17 @@ void Overlay::Impl::DrawAchievements(Client& c, float width) {
         if (unlocked) {
             ImGui::TextColored(kGreen, "%s", a.name.c_str());
         } else {
-            ImGui::TextDisabled("%s", secret ? "Secret achievement" : a.name.c_str());
+            ImGui::TextDisabled("%s", secret ? T("Secret achievement") : a.name.c_str());
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("%u G", a.score);
+        ImGui::TextDisabled(T("%u G"), a.score);
         ImGui::PushTextWrapPos(width - tile - 60.0f * scale);
         if (unlocked) {
             ImGui::TextUnformatted(a.unlocked_description.empty() ? a.locked_description.c_str()
                                                                   : a.unlocked_description.c_str());
-            if (!a.unlocked_at.empty()) ImGui::TextDisabled("unlocked %s", a.unlocked_at.substr(0, 10).c_str());
+            if (!a.unlocked_at.empty()) ImGui::TextDisabled(T("unlocked %s"), a.unlocked_at.substr(0, 10).c_str());
         } else if (secret) {
-            ImGui::TextDisabled("Keep playing to reveal it.");
+            ImGui::TextDisabled(T("Keep playing to reveal it."));
         } else {
             ImGui::TextUnformatted(a.locked_description.c_str());
         }
@@ -1394,6 +1434,7 @@ bool Overlay::Render(const VulkanHandles& handles, VkCommandBuffer cmd, VkImage 
     if (!client) return false;
 
     if (!s.initialized) {
+        s.client_for_init = client;
         s.Init(handles);
         if (!s.initialized) return false;
         s.generation = generation;
@@ -1405,6 +1446,7 @@ bool Overlay::Render(const VulkanHandles& handles, VkCommandBuffer cmd, VkImage 
             ImGui_ImplVulkan_Shutdown();
             ImGui::DestroyContext();
             s.initialized = false;
+            s.client_for_init = client;
             s.Init(handles);
             if (!s.initialized) return false;
         }

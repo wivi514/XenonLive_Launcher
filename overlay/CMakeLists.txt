@@ -45,7 +45,7 @@ target_include_directories(xlive_overlay
 )
 target_link_libraries(xlive_overlay PUBLIC Vulkan::Vulkan SDL2::SDL2 xlive::client)
 # Warnings for our file; none for ImGui's.
-set_source_files_properties(src/overlay.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../common/theme.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wshadow;-Wno-missing-field-initializers;-Wno-unused-function")
+set_source_files_properties(src/overlay.cpp ${CMAKE_CURRENT_SOURCE_DIR}/../common/theme.cpp PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Wshadow;-Wno-missing-field-initializers;-Wno-unused-function;-Wno-format-security")
 set_source_files_properties(
     ${XLIVE_OVERLAY_IMGUI}/imgui.cpp ${XLIVE_OVERLAY_IMGUI}/imgui_draw.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui_tables.cpp ${XLIVE_OVERLAY_IMGUI}/imgui_widgets.cpp
