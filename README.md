@@ -86,6 +86,19 @@ What XenonLive brings to each: signing in with your gamertag, achievements
 and gamerscore that persist, friends and where they are, invitations and
 online co-op (Case West), messages, and the in-game overlay.
 
+## Languages
+
+The launcher speaks the six languages the games do: English, French,
+Spanish, Italian, Japanese and Korean. It starts in your system's language
+and the picker is on the sign-in screen and under Account. Japanese and
+Korean need nothing installed — the launcher carries its own glyphs.
+
+Translations are one table, `common/strings.tsv` (one column per language,
+English as the key); a correction or a new language is a pull request
+against that file, and a draft can be tried without a rebuild by putting a
+`<code>.tsv` under `launcher/lang/` in the XenonLive data folder. The
+in-game overlay is still English.
+
 ## In the launcher
 
 - **Home** — your games: install, update, play, release notes. Updates are

@@ -19,12 +19,12 @@ using PresenceState = xlive::Client::PresenceState;
 
 std::string PresenceLine(const xlive::Client::Presence& p) {
     switch (p.state) {
-        case PresenceState::Offline: return "offline";
-        case PresenceState::Online:  return "online";
+        case PresenceState::Offline: return T("offline");
+        case PresenceState::Online:  return T("online");
         case PresenceState::Playing: {
-            std::string line = "playing " + (p.title_name.empty() ? "a game" : p.title_name);
+            std::string line = T("playing ") + (p.title_name.empty() ? T("a game") : p.title_name);
             if (!p.rich_text.empty() && p.rich_text != p.title_name) line += " - " + p.rich_text;
-            if (p.joinable) line += " (joinable)";
+            if (p.joinable) line += T(" (joinable)");
             return line;
         }
     }
@@ -56,57 +56,56 @@ void DrawFriendRow(App& app, const Friend& f, bool can_invite) {
         app.OpenProfile(f.xuid, f.gamertag);
     }
     ImGui::PopFont();
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("View profile");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip(T("View profile"));
     ImGui::SameLine();
-    ImGui::TextDisabled("%u G", f.gamerscore);
+    ImGui::TextDisabled(T("%u G"), f.gamerscore);
     ImGui::SameLine();
-    if (xlive::theme::SmallSecondaryButton("Profile")) app.OpenProfile(f.xuid, f.gamertag);
+    if (xlive::theme::SmallSecondaryButton(T("Profile"))) app.OpenProfile(f.xuid, f.gamertag);
 
     switch (f.relation) {
         case Relation::Friend: {
             ImGui::TextDisabled("%s", PresenceLine(f.presence).c_str());
             ImGui::BeginDisabled(!can_invite || !online);
-            if (ImGui::SmallButton("Invite")) {
+            if (ImGui::SmallButton(T("Invite"))) {
                 app.Issue(app.client->SendInvite(app.friends.mine.session_id, f.xuid),
-                          "Invite " + f.gamertag);
-                app.toasts.Push("Invitation sent to " + f.gamertag);
+                          T("Invite ") + f.gamertag);
+                app.toasts.Push(T("Invitation sent to ") + f.gamertag);
             }
             ImGui::EndDisabled();
             if (!can_invite && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled)) {
-                ImGui::SetTooltip("Start a game session first: an invitation names the "
-                                  "session you are in.");
+                ImGui::SetTooltip(T("Start a game session first: an invitation names the session you are in."));
             }
             ImGui::SameLine();
-            if (ImGui::SmallButton("Message")) app.OpenConversation(f.xuid, f.gamertag);
+            if (ImGui::SmallButton(T("Message"))) app.OpenConversation(f.xuid, f.gamertag);
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Remove")) {
-                app.Issue(app.client->RemoveFriend(f.xuid), "Remove " + f.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Remove"))) {
+                app.Issue(app.client->RemoveFriend(f.xuid), T("Remove ") + f.gamertag);
             }
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Block")) {
-                app.Issue(app.client->BlockPlayer(f.xuid), "Block " + f.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Block"))) {
+                app.Issue(app.client->BlockPlayer(f.xuid), T("Block ") + f.gamertag);
             }
             break;
         }
         case Relation::RequestReceived:
-            ImGui::TextDisabled("wants to be your friend");
+            ImGui::TextDisabled(T("wants to be your friend"));
             // Asking back is accepting: there is one route on the server.
-            if (ImGui::SmallButton("Accept")) {
-                app.Issue(app.client->AddFriend(f.xuid), "Accept " + f.gamertag);
+            if (ImGui::SmallButton(T("Accept"))) {
+                app.Issue(app.client->AddFriend(f.xuid), T("Accept ") + f.gamertag);
             }
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Decline")) {
-                app.Issue(app.client->RemoveFriend(f.xuid), "Decline " + f.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Decline"))) {
+                app.Issue(app.client->RemoveFriend(f.xuid), T("Decline ") + f.gamertag);
             }
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Block")) {
-                app.Issue(app.client->BlockPlayer(f.xuid), "Block " + f.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Block"))) {
+                app.Issue(app.client->BlockPlayer(f.xuid), T("Block ") + f.gamertag);
             }
             break;
         case Relation::RequestSent:
-            ImGui::TextDisabled("request sent");
-            if (xlive::theme::SmallSecondaryButton("Withdraw")) {
-                app.Issue(app.client->RemoveFriend(f.xuid), "Withdraw " + f.gamertag);
+            ImGui::TextDisabled(T("request sent"));
+            if (xlive::theme::SmallSecondaryButton(T("Withdraw"))) {
+                app.Issue(app.client->RemoveFriend(f.xuid), T("Withdraw ") + f.gamertag);
             }
             break;
         default:
@@ -132,33 +131,33 @@ void DrawFriends(App& app) {
             if (f.is_friend() && f.presence.online()) ++online;
         }
         char sub[48];
-        std::snprintf(sub, sizeof(sub), "%d online", online);
-        if (xlive::theme::PageHeader("Friends", sub, "Refresh")) {
+        std::snprintf(sub, sizeof(sub), T("%d online"), online);
+        if (xlive::theme::PageHeader(T("Friends"), sub, T("Refresh"))) {
             app.Issue(app.client->RefreshFriends(), "Refresh");
             app.friends.mine_loaded = false;
             app.RefreshMyPresence();
         }
     }
     ImGui::SetNextItemWidth(220.0f);
-    const bool enter = ImGui::InputTextWithHint("##add", "gamertag", app.friends.add_gamertag,
+    const bool enter = ImGui::InputTextWithHint("##add", T("gamertag"), app.friends.add_gamertag,
                                                 sizeof(app.friends.add_gamertag),
                                                 ImGuiInputTextFlags_EnterReturnsTrue);
     ImGui::SameLine();
-    if ((ImGui::Button("Add friend") || enter) && app.friends.add_gamertag[0] != '\0') {
+    if ((ImGui::Button(T("Add friend")) || enter) && app.friends.add_gamertag[0] != '\0') {
         const std::string tag = app.friends.add_gamertag;
-        app.Issue(app.client->AddFriendByGamertag(tag), "Add " + tag);
+        app.Issue(app.client->AddFriendByGamertag(tag), T("Add ") + tag);
         std::memset(app.friends.add_gamertag, 0, sizeof(app.friends.add_gamertag));
     }
 
     // -- what I can invite into ----------------------------------------------
     const bool can_invite = app.friends.mine_loaded && app.friends.mine.session_id != 0;
     if (app.friends.presence_ticket != 0) {
-        ImGui::TextDisabled("reading your presence...");
+        ImGui::TextDisabled(T("reading your presence..."));
     } else if (can_invite) {
-        ImGui::TextDisabled("in a session of %s - friends can be invited",
+        ImGui::TextDisabled(T("in a session of %s - friends can be invited"),
                             app.friends.mine.title_name.c_str());
     } else {
-        ImGui::TextDisabled("not in a game session - Invite needs one");
+        ImGui::TextDisabled(T("not in a game session - Invite needs one"));
     }
 
     // -- the list -----------------------------------------------------------
@@ -174,22 +173,22 @@ void DrawFriends(App& app) {
     }
 
     if (!received.empty()) {
-        xlive::theme::Section("Requests");
+        xlive::theme::Section(T("Requests"));
         for (const Friend* f : received) DrawFriendRow(app, *f, can_invite);
     }
 
-    xlive::theme::Section("Friends");
+    xlive::theme::Section(T("Friends"));
     if (friends.empty()) {
         ImGui::TextDisabled(list.empty() && !app.client->gateway_connected()
-                                ? "No friends yet, and no connection to the server."
-                                : "No friends yet.");
+                                ? T("No friends yet, and no connection to the server.")
+                                : T("No friends yet."));
     }
     // Online first; the cache is sorted by gamertag within that.
     for (const Friend* f : friends) if (f->presence.online()) DrawFriendRow(app, *f, can_invite);
     for (const Friend* f : friends) if (!f->presence.online()) DrawFriendRow(app, *f, can_invite);
 
     if (!sent.empty()) {
-        xlive::theme::Section("Sent");
+        xlive::theme::Section(T("Sent"));
         for (const Friend* f : sent) DrawFriendRow(app, *f, can_invite);
     }
 }

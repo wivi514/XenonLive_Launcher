@@ -15,6 +15,10 @@ std::string PresenceLine(const xlive::Client::Presence& p);
 // Shows a directory in the desktop's file browser.
 void OpenFolder(const std::string& path);
 
+// The language combo: system language, then the six. Sets
+// app.language_changed when picked. `width` is the combo's.
+void DrawLanguagePicker(App& app, float width);
+
 void DrawSignIn(App& app);
 void DrawHome(App& app);
 void DrawFriends(App& app);

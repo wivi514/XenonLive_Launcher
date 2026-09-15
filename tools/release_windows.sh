@@ -100,6 +100,7 @@ cp "\$ROOT/README.md" "\$STAGE/"
 cp "\$ROOT/tools/release/THIRD_PARTY.md" "\$STAGE/"
 # The font's licence must travel with the font (SIL OFL 1.1).
 cp "\$ROOT/thirdparty/selawik/LICENSE.txt" "\$STAGE/LICENSE-Selawik.txt"
+cp "\$ROOT/thirdparty/notocjk/LICENSE.txt" "\$STAGE/LICENSE-NotoSansCJK.txt"
 echo "    DLL imports of the executable:"
 x86_64-w64-mingw32-objdump -p "\$STAGE/xenonlive_launcher.exe" | grep 'DLL Name' | sed 's/^/      /'
 (cd "\$OUT/.stage-windows" && rm -f "\$OUT/\$NAME-windows-x86_64.zip" && zip -qr "\$OUT/\$NAME-windows-x86_64.zip" "\$NAME")

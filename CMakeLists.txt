@@ -57,8 +57,8 @@ target_compile_options(zstddec PRIVATE -w)
 
 # Selawik (SIL OFL), the UI font, as bytes in the binary; and the theme
 # both the launcher and the overlay draw with.
-add_library(selawik STATIC thirdparty/selawik/selawik_data.cpp)
-target_include_directories(selawik PUBLIC thirdparty/selawik)
+add_library(selawik STATIC thirdparty/selawik/selawik_data.cpp thirdparty/notocjk/notocjk_data.cpp)
+target_include_directories(selawik PUBLIC thirdparty/selawik thirdparty/notocjk)
 
 add_executable(xenonlive_launcher
     common/theme.cpp
@@ -81,9 +81,12 @@ add_executable(xenonlive_launcher
     src/screens/achievements.cpp
     src/screens/profile.cpp
     src/captures.cpp
+    common/i18n.cpp
+    common/strings_data.cpp
     src/selfupdate.cpp
     src/screens/issues.cpp
     src/screens/account.cpp
+    src/screens/language.cpp
     src/screens/support.cpp
 )
 target_include_directories(xenonlive_launcher PRIVATE
@@ -101,6 +104,7 @@ target_include_directories(xenonlive_launcher PRIVATE
 set_source_files_properties(src/images.cpp PROPERTIES COMPILE_OPTIONS "-Wno-unused-function")
 target_compile_options(xenonlive_launcher PRIVATE
     $<$<CXX_COMPILER_ID:GNU,Clang,AppleClang>:-Wall -Wextra -Wshadow>
+    $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wno-format-security>
     $<$<CXX_COMPILER_ID:MSVC>:/W4>
 )
 # The version the binary reports and compares against the launcher's own

@@ -40,7 +40,12 @@ struct Fonts {
     ImFont* heading = nullptr;
     ImFont* title = nullptr;
 };
-Fonts LoadFonts(ImGuiIO& io, float body_size, const char* override_path = nullptr);
+// cjk_lang ("ja" or "ko") merges the compiled-in Noto Sans CJK subset into
+// every face behind Selawik; cjk_path, a system CJK font when one exists,
+// is merged behind that into the body face for glyphs the subset lacks.
+// Call again after io.Fonts->Clear() to change language.
+Fonts LoadFonts(ImGuiIO& io, float body_size, const char* override_path = nullptr,
+                const char* cjk_path = nullptr, const char* cjk_lang = nullptr);
 
 // -- widgets in the house style ----------------------------------------------
 

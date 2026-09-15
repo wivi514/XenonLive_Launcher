@@ -106,6 +106,7 @@ cp "\$ROOT/README.md" "\$STAGE/"
 cp "\$ROOT/tools/release/THIRD_PARTY.md" "\$STAGE/"
 # The font's licence must travel with the font (SIL OFL 1.1).
 cp "\$ROOT/thirdparty/selawik/LICENSE.txt" "\$STAGE/LICENSE-Selawik.txt"
+cp "\$ROOT/thirdparty/notocjk/LICENSE.txt" "\$STAGE/LICENSE-NotoSansCJK.txt"
 echo "    linked libs:"; ldd "\$STAGE/xenonlive_launcher" | sed 's/^/      /'
 echo "    glibc floor: \$(objdump -T "\$STAGE/xenonlive_launcher" | grep -o 'GLIBC_[0-9.]*' | sort -V | tail -1)"
 if ldd "\$STAGE/xenonlive_launcher" | grep -qE 'libcurl|libssl|libcrypto|libz\\.so'; then

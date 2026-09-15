@@ -23,6 +23,9 @@ add_library(xlive_overlay STATIC
     # The theme and font shared with the launcher.
     ${CMAKE_CURRENT_SOURCE_DIR}/../common/theme.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/selawik/selawik_data.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/notocjk/notocjk_data.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common/i18n.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../common/strings_data.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui_draw.cpp
     ${XLIVE_OVERLAY_IMGUI}/imgui_tables.cpp
@@ -38,6 +41,7 @@ target_include_directories(xlive_overlay
     # stb_image.h, for the achievement tiles.
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/stb
     PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../common ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/selawik
+    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../thirdparty/notocjk
 )
 target_link_libraries(xlive_overlay PUBLIC Vulkan::Vulkan SDL2::SDL2 xlive::client)
 # Warnings for our file; none for ImGui's.

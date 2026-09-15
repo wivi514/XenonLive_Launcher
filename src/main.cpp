@@ -135,7 +135,20 @@ int main(int, char**) {
         return 1;
     }
     app.ui_scale = ui_scale;
-    app.fonts = xlive::theme::LoadFonts(io, app.config.font_size * ui_scale, app.config.font_path.c_str());
+    // The language: launcher.json's, else the system's. A translator's
+    // draft in launcher/lang/<code>.tsv rides on top of the built-in table.
+    xlive::i18n::LoadOverrides((launcher::DataDir() / "launcher" / "lang").string());
+    app.ApplyLanguage();
+    const auto load_fonts = [&] {
+        const char* cjk_lang = xlive::i18n::Info(xlive::i18n::Current()).cjk
+                                   ? xlive::i18n::Info(xlive::i18n::Current()).code
+                                   : nullptr;
+        app.fonts = xlive::theme::LoadFonts(io, app.config.font_size * ui_scale,
+                                            app.config.font_path.c_str(),
+                                            app.cjk_font.empty() ? nullptr : app.cjk_font.c_str(),
+                                            cjk_lang);
+    };
+    load_fonts();
     app.images.Open(renderer, launcher::DataDir() / "launcher");
     app.images.set_server(app.config.server);
     app.tab = StartingTab();
@@ -204,6 +217,18 @@ int main(int, char**) {
             // Still drain events and tickets so nothing piles up unseen.
         }
 
+        // A language change between frames: the string table switches at
+        // once; the fonts are rebuilt (a CJK language needs its font in
+        // the atlas) and the backend re-uploads the atlas on the next frame.
+        if (app.language_changed) {
+            app.language_changed = false;
+            app.SaveConfigOrToast();
+            app.ApplyLanguage();
+            ImGui_ImplSDLRenderer2_DestroyFontsTexture();
+            io.Fonts->Clear();
+            load_fonts();
+            io.Fonts->Build();
+        }
         ImGui_ImplSDLRenderer2_NewFrame();
         ImGui_ImplSDL2_NewFrame();
         ImGui::NewFrame();

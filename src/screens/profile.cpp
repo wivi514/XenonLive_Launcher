@@ -37,7 +37,7 @@ void DrawSide(const char* who, const Achievement* a) {
     ImGui::TextDisabled("%s", who);
     ImGui::SameLine();
     if (a && a->unlocked) {
-        ImGui::TextColored(xlive::theme::kLime, "unlocked");
+        ImGui::TextColored(xlive::theme::kLime, T("unlocked"));
         if (!a->unlocked_at.empty()) {
             ImGui::SameLine();
             ImGui::TextDisabled("%s", DateOf(a->unlocked_at).c_str());
@@ -50,13 +50,13 @@ void DrawSide(const char* who, const Achievement* a) {
 void DrawCompare(App& app) {
     App::ProfileState& p = app.profile;
     if (p.theirs_ticket != 0 || p.mine_ticket != 0) {
-        ImGui::TextDisabled("loading...");
+        ImGui::TextDisabled(T("loading..."));
         return;
     }
     if (!p.compare_error.empty()) {
         ImGui::TextColored(xlive::theme::kRed, "%s", p.compare_error.c_str());
         if (p.compare_error == "not_friends") {
-            ImGui::TextWrapped("%s has not accepted you as a friend yet.", p.gamertag.c_str());
+            ImGui::TextWrapped(T("%s has not accepted you as a friend yet."), p.gamertag.c_str());
         }
         return;
     }
@@ -77,15 +77,15 @@ void DrawCompare(App& app) {
     ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", theirs.name.c_str());
     ImGui::PopFont();
-    ImGui::Text("%s: %u / %u G, %u of %zu", p.gamertag.c_str(), theirs.gamerscore,
+    ImGui::Text(T("%s: %u / %u G, %u of %zu"), p.gamertag.c_str(), theirs.gamerscore,
                 theirs.max_gamerscore, their_count, theirs.achievements.size());
-    ImGui::Text("You: %u / %u G, %u of %zu", mine.gamerscore, mine.max_gamerscore, my_count,
+    ImGui::Text(T("You: %u / %u G, %u of %zu"), mine.gamerscore, mine.max_gamerscore, my_count,
                 mine.achievements.size());
     ImGui::EndGroup();
 
     ImGui::SetNextItemWidth(260.0f);
-    const char* filters[] = {"Every achievement", "Only what they have and you don't",
-                             "Only what you have and they don't"};
+    const char* filters[] = {T("Every achievement"), T("Only what they have and you don't"),
+                             T("Only what you have and they don't")};
     ImGui::Combo("##filter", &p.compare_filter, filters, 3);
     ImGui::Separator();
 
@@ -120,9 +120,9 @@ void DrawCompare(App& app) {
         }
         ImGui::SameLine();
         ImGui::BeginGroup();
-        ImGui::Text("%s", secret ? "Secret achievement" : t.name.c_str());
+        ImGui::Text("%s", secret ? T("Secret achievement") : t.name.c_str());
         ImGui::SameLine();
-        ImGui::TextDisabled("%u G", t.score);
+        ImGui::TextDisabled(T("%u G"), t.score);
         DrawSide(p.gamertag.c_str(), &t);
         DrawSide("You", m);
         ImGui::EndGroup();
@@ -130,8 +130,8 @@ void DrawCompare(App& app) {
         ImGui::PopID();
     }
     if (shown == 0) {
-        ImGui::TextDisabled(p.compare_filter == 1 ? "Nothing they have that you don't."
-                                                  : "Nothing you have that they don't.");
+        ImGui::TextDisabled(p.compare_filter == 1 ? T("Nothing they have that you don't.")
+                                                  : T("Nothing you have that they don't."));
     }
 }
 
@@ -139,7 +139,7 @@ void DrawCompare(App& app) {
 
 void DrawProfile(App& app) {
     App::ProfileState& p = app.profile;
-    if (ImGui::TextLink("< Friends")) {
+    if (ImGui::TextLink(T("< Friends"))) {
         app.tab = Tab::Friends;
         return;
     }
@@ -150,7 +150,7 @@ void DrawProfile(App& app) {
     const bool is_friend = listed && entry.is_friend();
 
     ImGui::BeginDisabled(p.card_ticket != 0);
-    const bool refresh = xlive::theme::PageHeader(p.gamertag.c_str(), nullptr, "Refresh");
+    const bool refresh = xlive::theme::PageHeader(p.gamertag.c_str(), nullptr, T("Refresh"));
     ImGui::EndDisabled();
     if (refresh) {
         const uint32_t compare = p.compare_title;
@@ -158,19 +158,19 @@ void DrawProfile(App& app) {
         if (compare) app.LoadCompare(compare);
     }
     if (p.card_ticket != 0) {
-        ImGui::TextDisabled("loading...");
+        ImGui::TextDisabled(T("loading..."));
     } else if (!p.card_error.empty()) {
         ImGui::TextColored(xlive::theme::kRed, "%s", p.card_error.c_str());
     } else if (p.card_loaded) {
         const xlive::Client::Gamercard& card = p.card.card;
-        ImGui::TextDisabled("%u G", card.gamerscore);
+        ImGui::TextDisabled(T("%u G"), card.gamerscore);
         if (!card.country.empty()) {
             ImGui::SameLine();
             ImGui::TextDisabled("- %s", card.country.c_str());
         }
         if (!card.created_at.empty()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("- member since %s", DateOf(card.created_at).c_str());
+            ImGui::TextDisabled(T("- member since %s"), DateOf(card.created_at).c_str());
         }
     }
     if (is_friend) ImGui::TextDisabled("%s", PresenceLine(entry.presence).c_str());
@@ -180,35 +180,35 @@ void DrawProfile(App& app) {
         if (is_friend) {
             const bool can_invite = app.friends.mine_loaded && app.friends.mine.session_id != 0;
             ImGui::BeginDisabled(!can_invite || !entry.presence.online());
-            if (ImGui::SmallButton("Invite")) {
+            if (ImGui::SmallButton(T("Invite"))) {
                 app.Issue(app.client->SendInvite(app.friends.mine.session_id, entry.xuid),
-                          "Invite " + entry.gamertag);
-                app.toasts.Push("Invitation sent to " + entry.gamertag);
+                          T("Invite ") + entry.gamertag);
+                app.toasts.Push(T("Invitation sent to ") + entry.gamertag);
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
-            if (ImGui::SmallButton("Message")) app.OpenConversation(entry.xuid, entry.gamertag);
+            if (ImGui::SmallButton(T("Message"))) app.OpenConversation(entry.xuid, entry.gamertag);
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Remove friend")) {
-                app.Issue(app.client->RemoveFriend(entry.xuid), "Remove " + entry.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Remove friend"))) {
+                app.Issue(app.client->RemoveFriend(entry.xuid), T("Remove ") + entry.gamertag);
             }
         } else if (listed && entry.relation == Relation::RequestReceived) {
-            if (ImGui::SmallButton("Accept request")) {
-                app.Issue(app.client->AddFriend(entry.xuid), "Accept " + entry.gamertag);
+            if (ImGui::SmallButton(T("Accept request"))) {
+                app.Issue(app.client->AddFriend(entry.xuid), T("Accept ") + entry.gamertag);
             }
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Decline")) {
-                app.Issue(app.client->RemoveFriend(entry.xuid), "Decline " + entry.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Decline"))) {
+                app.Issue(app.client->RemoveFriend(entry.xuid), T("Decline ") + entry.gamertag);
             }
         } else if (listed && entry.relation == Relation::RequestSent) {
-            ImGui::TextDisabled("friend request sent");
+            ImGui::TextDisabled(T("friend request sent"));
             ImGui::SameLine();
-            if (xlive::theme::SmallSecondaryButton("Withdraw")) {
-                app.Issue(app.client->RemoveFriend(entry.xuid), "Withdraw " + entry.gamertag);
+            if (xlive::theme::SmallSecondaryButton(T("Withdraw"))) {
+                app.Issue(app.client->RemoveFriend(entry.xuid), T("Withdraw ") + entry.gamertag);
             }
         } else if (p.xuid != app.client->identity().xuid) {
-            if (ImGui::SmallButton("Add friend")) {
-                app.Issue(app.client->AddFriend(p.xuid), "Add " + p.gamertag);
+            if (ImGui::SmallButton(T("Add friend"))) {
+                app.Issue(app.client->AddFriend(p.xuid), T("Add ") + p.gamertag);
             }
         }
     }
@@ -218,13 +218,13 @@ void DrawProfile(App& app) {
     const xlive::Client::Gamercard& card = p.card.card;
 
     // -- games ------------------------------------------------------------------
-    xlive::theme::Section("Games");
+    xlive::theme::Section(T("Games"));
     if (!card.achievements_visible) {
-        ImGui::TextWrapped("%s's achievements are visible to the friends they have accepted.",
+        ImGui::TextWrapped(T("%s's achievements are visible to the friends they have accepted."),
                            p.gamertag.c_str());
         return;
     }
-    if (card.titles.empty()) ImGui::TextDisabled("This server has no titles imported.");
+    if (card.titles.empty()) ImGui::TextDisabled(T("This server has no titles imported."));
     for (const xlive::Client::PlayedTitle& t : card.titles) {
         ImGui::PushID(int(t.title_id));
         ImGui::BeginChild("game", ImVec2(0.0f, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AutoResizeY | ImGuiChildFlags_Borders);
@@ -237,18 +237,18 @@ void DrawProfile(App& app) {
         ImGui::Text("%s", t.name.c_str());
         ImGui::PopFont();
         ImGui::SameLine();
-        ImGui::TextDisabled("%u / %u G", t.gamerscore, t.max_gamerscore);
+        ImGui::TextDisabled(T("%u / %u G"), t.gamerscore, t.max_gamerscore);
         if (!t.last_unlocked_at.empty()) {
             ImGui::SameLine();
-            ImGui::TextDisabled("- last unlock %s", DateOf(t.last_unlocked_at).c_str());
+            ImGui::TextDisabled(T("- last unlock %s"), DateOf(t.last_unlocked_at).c_str());
         }
         char overlay[64];
-        std::snprintf(overlay, sizeof(overlay), "%u of %u", t.unlocked, t.total);
+        std::snprintf(overlay, sizeof(overlay), T("%u of %u"), t.unlocked, t.total);
         DrawProgressBar(t.unlocked, t.total, overlay);
         ImGui::SameLine();
         const bool comparing = p.compare_title == t.title_id;
         if (comparing) ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_ButtonActive));
-        if (ImGui::SmallButton(comparing ? "Comparing" : "Compare achievements")) {
+        if (ImGui::SmallButton(comparing ? T("Comparing") : T("Compare achievements"))) {
             if (!comparing) app.LoadCompare(t.title_id);
         }
         if (comparing) ImGui::PopStyleColor();
@@ -258,7 +258,7 @@ void DrawProfile(App& app) {
     }
 
     if (p.compare_title != 0) {
-        xlive::theme::Section("Achievements");
+        xlive::theme::Section(T("Achievements"));
         DrawCompare(app);
     }
 }

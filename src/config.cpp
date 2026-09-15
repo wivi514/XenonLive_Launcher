@@ -91,6 +91,7 @@ bool LoadConfig(Config& out, std::string& error) {
     if (doc.Has("allow_insecure")) out.allow_insecure = doc["allow_insecure"].AsBool();
     if (doc.Has("font_path")) out.font_path = doc["font_path"].AsString();
     if (doc.Has("font_size")) out.font_size = float(doc["font_size"].AsDouble(18.0));
+    if (doc.Has("language")) out.language = doc["language"].AsString();
     if (doc.Has("games_dir")) out.games_dir = doc["games_dir"].AsString();
 
     const xlive::json::Value& titles = doc["titles"];
@@ -126,6 +127,7 @@ bool SaveConfig(const Config& config, std::string& error) {
     doc.Set("allow_insecure", Value::Bool(config.allow_insecure));
     if (!config.font_path.empty()) doc.Set("font_path", Value::String(config.font_path));
     doc.Set("font_size", Value::Number(config.font_size));
+    if (!config.language.empty()) doc.Set("language", Value::String(config.language));
     if (!config.games_dir.empty()) doc.Set("games_dir", Value::String(config.games_dir));
 
     Value titles = Value::Array();

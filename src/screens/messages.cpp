@@ -77,7 +77,7 @@ bool DrawPerson(App& app, uint64_t xuid, const std::string& gamertag, const Mess
     }
     // The latest line, clipped to the row.
     if (latest) {
-        const std::string line = (latest->from_xuid == xuid ? "" : "You: ") + latest->body;
+        const std::string line = (latest->from_xuid == xuid ? "" : T("You: ")) + latest->body;
         const float y = pos.y + 10.0f + app.fonts.heading->FontSize;
         draw->PushClipRect(ImVec2(pos.x + 26.0f, y), ImVec2(max.x - 10.0f, max.y), true);
         draw->AddText(ImVec2(pos.x + 26.0f, y),
@@ -124,7 +124,7 @@ void DrawMessages(App& app) {
 
     // -- the people column --------------------------------------------------
     ImGui::BeginChild("people", ImVec2(250.0f * app.ui_scale, 0.0f), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_Borders);
-    xlive::theme::Section("Messages");
+    xlive::theme::Section(T("Messages"));
     const auto friends = app.client->friends();
     const auto find_friend = [&](uint64_t xuid) -> const xlive::Client::Friend* {
         for (const auto& f : friends) if (f.xuid == xuid) return &f;
@@ -147,14 +147,14 @@ void DrawMessages(App& app) {
         if (std::find(listed.begin(), listed.end(), f.xuid) != listed.end()) continue;
         if (!any_more) {
             any_more = true;
-            if (!listed.empty()) ImGui::TextDisabled("Friends");
+            if (!listed.empty()) ImGui::TextDisabled(T("Friends"));
         }
         if (DrawPerson(app, f.xuid, f.gamertag, nullptr, f.presence.online(), m.peer == f.xuid)) {
             app.OpenConversation(f.xuid, f.gamertag);
         }
     }
     if (listed.empty() && !any_more) {
-        ImGui::TextWrapped("Add a friend on the Friends tab; messages go between friends.");
+        ImGui::TextWrapped(T("Add a friend on the Friends tab; messages go between friends."));
     }
     ImGui::EndChild();
     ImGui::SameLine();
@@ -164,8 +164,7 @@ void DrawMessages(App& app) {
     if (m.peer == 0) {
         ImGui::Dummy(ImVec2(0.0f, 40.0f));
         ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-        ImGui::TextWrapped("Pick someone to read your messages with them. A message is up to 256 "
-                           "characters; the last 20 between you are kept.");
+        ImGui::TextWrapped(T("Pick someone to read your messages with them. A message is up to 256 characters; the last 20 between you are kept."));
         ImGui::PopStyleColor();
         ImGui::EndGroup();
         return;
@@ -179,10 +178,10 @@ void DrawMessages(App& app) {
     if (peer && peer->is_friend()) {
         ImGui::TextDisabled("%s", PresenceLine(peer->presence).c_str());
     } else {
-        ImGui::TextDisabled("not a friend any more; you can read, not write");
+        ImGui::TextDisabled(T("not a friend any more; you can read, not write"));
     }
     ImGui::SameLine();
-    if (xlive::theme::SmallSecondaryButton("Profile")) app.OpenProfile(m.peer, m.peer_gamertag);
+    if (xlive::theme::SmallSecondaryButton(T("Profile"))) app.OpenProfile(m.peer, m.peer_gamertag);
 
     // The log fills what the input box leaves.
     const float input_height = ImGui::GetTextLineHeight() * 3.0f + 24.0f + ImGui::GetFrameHeight();
@@ -192,9 +191,9 @@ void DrawMessages(App& app) {
     if (!m.error.empty()) {
         ImGui::TextColored(kRed, "%s", m.error.c_str());
     } else if (!m.conversation_loaded && m.conversation_ticket != 0) {
-        ImGui::TextDisabled("loading...");
+        ImGui::TextDisabled(T("loading..."));
     } else if (m.conversation.empty()) {
-        ImGui::TextDisabled("No messages yet. Say hello.");
+        ImGui::TextDisabled(T("No messages yet. Say hello."));
     }
     for (const Message& message : m.conversation) {
         ImGui::PushID(int(message.id));
@@ -224,12 +223,12 @@ void DrawMessages(App& app) {
     ImGui::SameLine();
     ImGui::BeginGroup();
     ImGui::BeginDisabled(over || m.draft[0] == '\0');
-    if (ImGui::Button("Send", ImVec2(-1.0f, 0.0f)) || (enter && !over)) app.SendDraft();
+    if (ImGui::Button(T("Send"), ImVec2(-1.0f, 0.0f)) || (enter && !over)) app.SendDraft();
     ImGui::EndDisabled();
-    ImGui::TextColored(over ? kRed : kMuted, "%zu / %zu", length, xlive::Client::kMaxMessageLength);
+    ImGui::TextColored(over ? kRed : kMuted, T("%zu / %zu"), length, xlive::Client::kMaxMessageLength);
     ImGui::EndGroup();
     ImGui::EndDisabled();
-    if (m.send_ticket != 0) ImGui::TextDisabled("sending...");
+    if (m.send_ticket != 0) ImGui::TextDisabled(T("sending..."));
     ImGui::EndGroup();
 }
 

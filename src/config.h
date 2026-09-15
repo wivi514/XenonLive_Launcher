@@ -44,6 +44,8 @@ struct Config {
     // An optional TTF to use instead of the bundled Selawik (for CJK, say).
     std::string font_path;
     float font_size = 18.0f;
+    // "fr", "ja"...; empty means the system's language.
+    std::string language;
     // Where installed games go; empty means GamesDir()'s default.
     std::string games_dir;
     std::vector<TitleEntry> titles;

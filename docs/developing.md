@@ -263,6 +263,27 @@ looked up at run time. Regular for the body, semibold for headings and the
 wordmark. It covers Latin with accents; `"font_path"` and `"font_size"` in
 `launcher.json` swap in another TTF (for CJK, say).
 
+## Languages
+
+Every player-facing string is `T("English text")` (`common/i18n.h`); the
+English is the key and `common/strings.tsv` is the table — one row per
+string, one column per language, tab-separated, `\n` for a newline, an
+empty cell falling back to English. `tools/gen_strings.py` turns it into
+`common/strings_data.cpp` (committed; run it after editing the table — it
+refuses a translation whose `%` directives differ from the key's). Format
+strings keep their `%s`/`%d` in the same order in every language; where
+that cannot read well, the sentence is built from fragments instead.
+
+Adding a language: a column in the TSV, a `Lang` and a line in `kLangs`
+in `common/i18n.cpp`, and — if it needs glyphs Selawik lacks — a run of
+`tools/gen_cjk_font.py`, which subsets Noto Sans CJK to the characters the
+ja/ko columns use (a few hundred KB) into `thirdparty/notocjk/`, compiled
+in. A system CJK font, when found, is merged behind it into the body face
+for what friends type. Overrides: `<data dir>/launcher/lang/<code>.tsv`
+with `key<TAB>translation` lines, loaded at start.
+
+Headless: `"language": "fr"` in `launcher.json` (empty = system).
+
 ## Driving it from a shell
 
 A few environment variables exist for running the launcher with nobody at the

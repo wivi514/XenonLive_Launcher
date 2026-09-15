@@ -9,14 +9,14 @@ namespace launcher {
 
 void DrawAchievements(App& app) {
     if (app.config.titles.empty()) {
-        ImGui::TextDisabled("Add a title on the Home tab first.");
+        ImGui::TextDisabled(T("Add a title on the Home tab first."));
         return;
     }
 
     int index = app.achievements.title_index < 0 ? 0 : app.achievements.title_index;
     if (index >= int(app.config.titles.size())) index = 0;
     ImGui::BeginDisabled(app.achievements.ticket != 0);
-    const bool refresh = xlive::theme::PageHeader("Achievements", nullptr, "Refresh");
+    const bool refresh = xlive::theme::PageHeader(T("Achievements"), nullptr, T("Refresh"));
     ImGui::EndDisabled();
     if (refresh) app.LoadAchievements(index);
 
@@ -39,14 +39,13 @@ void DrawAchievements(App& app) {
     }
 
     if (app.achievements.ticket != 0) {
-        ImGui::TextDisabled("loading...");
+        ImGui::TextDisabled(T("loading..."));
         return;
     }
     if (!app.achievements.error.empty()) {
         ImGui::TextColored(xlive::theme::kRed, "%s", app.achievements.error.c_str());
         if (app.achievements.error == "no_title") {
-            ImGui::TextWrapped("This server has not imported the title. "
-                               "tools/spa_import.py in XenonLive does that.");
+            ImGui::TextWrapped(T("This server has not imported the title. tools/spa_import.py in XenonLive does that."));
         }
         return;
     }
@@ -63,7 +62,7 @@ void DrawAchievements(App& app) {
     ImGui::PushFont(app.fonts.heading);
     ImGui::Text("%s", title.name.c_str());
     ImGui::PopFont();
-    ImGui::TextDisabled("%u / %u G, %u of %zu unlocked", title.gamerscore, title.max_gamerscore,
+    ImGui::TextDisabled(T("%u / %u G, %u of %zu unlocked"), title.gamerscore, title.max_gamerscore,
                         unlocked, title.achievements.size());
     // How far along, as a bar: the dashboard showed one per game.
     {
@@ -101,20 +100,20 @@ void DrawAchievements(App& app) {
         if (a.unlocked) {
             ImGui::TextColored(xlive::theme::kLime, "%s", a.name.c_str());
         } else {
-            ImGui::TextDisabled("%s", secret ? "Secret achievement" : a.name.c_str());
+            ImGui::TextDisabled("%s", secret ? T("Secret achievement") : a.name.c_str());
         }
         ImGui::SameLine();
-        ImGui::TextDisabled("%u G", a.score);
+        ImGui::TextDisabled(T("%u G"), a.score);
         if (a.unlocked) {
             ImGui::TextWrapped("%s", a.unlocked_description.empty() ? a.locked_description.c_str()
                                                                      : a.unlocked_description.c_str());
             if (!a.unlocked_at.empty()) {
-                ImGui::TextDisabled("unlocked %s", a.unlocked_at.substr(0, 10).c_str());
+                ImGui::TextDisabled(T("unlocked %s"), a.unlocked_at.substr(0, 10).c_str());
             }
         } else if (!secret) {
             ImGui::TextWrapped("%s", a.locked_description.c_str());
         } else {
-            ImGui::TextDisabled("Continue playing to unlock this secret achievement.");
+            ImGui::TextDisabled(T("Continue playing to unlock this secret achievement."));
         }
         ImGui::EndGroup();
         ImGui::EndChild();

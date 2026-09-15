@@ -3,7 +3,10 @@
 #include <algorithm>
 #include <cstdio>
 #include <cstring>
+#include <string>
 
+#include "i18n.h"
+#include "notocjk.h"
 #include "selawik.h"
 
 namespace xlive::theme {
@@ -87,13 +90,60 @@ void Apply(ImGuiStyle& style, float scale, float bg_alpha) {
     c[ImGuiCol_ModalWindowDimBg] = ImVec4(0, 0, 0, 0.6f);
 }
 
-Fonts LoadFonts(ImGuiIO& io, float body_size, const char* override_path) {
+Fonts LoadFonts(ImGuiIO& io, float body_size, const char* override_path, const char* cjk_path,
+                const char* cjk_lang) {
     Fonts fonts;
+    // Japanese and Korean: the launcher's own strings come from the Noto
+    // Sans CJK subset compiled in (every glyph the table uses, the kana,
+    // the compatibility jamo, CJK punctuation), merged into each face
+    // behind Selawik. A system CJK font, when there is one, is merged
+    // behind that into the body face only, with the broad ranges, so a
+    // friend's message reaches glyphs the subset has not — the body face
+    // is the one chat is set in, and the broad Korean range at three sizes
+    // would not fit one atlas.
+    static ImVector<ImWchar> subset_ranges;
+    const bool cjk = cjk_lang && *cjk_lang;
+    const bool ko = cjk && std::string(cjk_lang) == "ko";
+    if (cjk) {
+        ImFontGlyphRangesBuilder builder;
+        for (const std::string& text :
+             xlive::i18n::AllTexts(ko ? xlive::i18n::Lang::Ko : xlive::i18n::Lang::Ja)) {
+            builder.AddText(text.c_str());
+        }
+        static const ImWchar extra[] = {0x3000, 0x303F, 0x3041, 0x3096, 0x30A1, 0x30FA, 0x30FC, 0x30FC,
+                                        0x3131, 0x3163, 0xFF01, 0xFF60, 0};
+        builder.AddRanges(extra);
+        subset_ranges.clear();
+        builder.BuildRanges(&subset_ranges);
+    }
+    const auto merge_cjk = [&](float size, bool body_face) {
+        if (!cjk) return;
+        ImFontConfig merge;
+        merge.MergeMode = true;
+        merge.PixelSnapH = true;
+        merge.FontDataOwnedByAtlas = false;
+        std::snprintf(merge.Name, sizeof(merge.Name), "Noto CJK subset %.0fpx", size);
+        io.Fonts->AddFontFromMemoryTTF(const_cast<unsigned char*>(notocjk::kSubset),
+                                       int(notocjk::kSubsetSize), size, &merge, subset_ranges.Data);
+        if (body_face && cjk_path && *cjk_path) {
+            ImFontConfig system;
+            system.MergeMode = true;
+            system.PixelSnapH = true;
+            std::snprintf(system.Name, sizeof(system.Name), "CJK system %.0fpx", size);
+            const ImWchar* broad = ko ? io.Fonts->GetGlyphRangesKorean() : io.Fonts->GetGlyphRangesJapanese();
+            if (!io.Fonts->AddFontFromFileTTF(cjk_path, size, &system, broad)) {
+                std::fprintf(stderr, "[xlive] could not load CJK font %s\n", cjk_path);
+            }
+        }
+    };
     if (override_path && *override_path) {
         fonts.body = io.Fonts->AddFontFromFileTTF(override_path, body_size);
         if (fonts.body) {
+            merge_cjk(body_size, true);
             fonts.heading = io.Fonts->AddFontFromFileTTF(override_path, body_size * 1.3f);
+            merge_cjk(body_size * 1.3f, false);
             fonts.title = io.Fonts->AddFontFromFileTTF(override_path, body_size * 1.7f);
+            merge_cjk(body_size * 1.7f, false);
         } else {
             std::fprintf(stderr, "[xlive] could not load font %s; using Selawik\n", override_path);
         }
@@ -105,14 +155,17 @@ Fonts LoadFonts(ImGuiIO& io, float body_size, const char* override_path) {
         std::snprintf(config.Name, sizeof(config.Name), "Selawik %.0fpx", body_size);
         fonts.body = io.Fonts->AddFontFromMemoryTTF(
             const_cast<unsigned char*>(selawik::kRegular), int(selawik::kRegularSize), body_size, &config);
+        merge_cjk(body_size, true);
         std::snprintf(config.Name, sizeof(config.Name), "Selawik Semibold %.0fpx", body_size * 1.3f);
         fonts.heading = io.Fonts->AddFontFromMemoryTTF(
             const_cast<unsigned char*>(selawik::kSemibold), int(selawik::kSemiboldSize),
             body_size * 1.3f, &config);
+        merge_cjk(body_size * 1.3f, false);
         std::snprintf(config.Name, sizeof(config.Name), "Selawik Semibold %.0fpx", body_size * 1.7f);
         fonts.title = io.Fonts->AddFontFromMemoryTTF(
             const_cast<unsigned char*>(selawik::kSemibold), int(selawik::kSemiboldSize),
             body_size * 1.7f, &config);
+        merge_cjk(body_size * 1.7f, false);
     }
     if (!fonts.heading) fonts.heading = fonts.body;
     if (!fonts.title) fonts.title = fonts.heading;

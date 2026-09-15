@@ -7,6 +7,7 @@
 | stb_image | 2.30 | MIT / public domain | thirdparty/stb (compiled in) |
 | zstd (decoder) | 1.5.7 | BSD | thirdparty/zstd (compiled in) |
 | Selawik (font) | 1.01 | SIL OFL 1.1 | thirdparty/selawik (compiled in as bytes) |
+| Noto Sans CJK JP (font) | 2.004 | SIL OFL 1.1 | thirdparty/notocjk, subset to the launcher's Japanese and Korean strings (compiled in as bytes) |
 | SDL2 | 2.32.10 | zlib | lib/libSDL2-2.0.so.0 (Linux), SDL2.dll (Windows) |
 | libcurl | 8.14.1 | curl (MIT-like) | statically linked; HTTP only, no zlib |
 | OpenSSL | 3.0 (Ubuntu 22.04) | Apache 2.0 | statically linked (Linux) |
@@ -16,4 +17,4 @@
 On Windows, TLS is the operating system's (Schannel); no OpenSSL is shipped.
 The licence texts are in the components' own distributions; ImGui's, miniz's,
 stb's and zstd's are beside the vendored files in the source repository;
-Selawik's is LICENSE-Selawik.txt beside this file.
+Selawik's is LICENSE-Selawik.txt beside this file; Noto Sans CJK's is LICENSE-NotoSansCJK.txt.

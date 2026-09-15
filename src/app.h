@@ -17,6 +17,7 @@
 
 #include "accounts.h"
 #include "captures.h"
+#include "i18n.h"
 #include "presence_announcer.h"
 #include "catalog.h"
 #include "config.h"
@@ -28,6 +29,8 @@
 #include "xlive/client.h"
 
 namespace launcher {
+
+using xlive::i18n::T;
 
 // Profile is not on the rail: it opens from a friend's row and Back returns
 // to Friends.
@@ -72,6 +75,17 @@ public:
     // The UI scale main chose (1.3 on a Steam Deck); the few fixed widths
     // in the layout multiply by it.
     float ui_scale = 1.0f;
+    // Set by the language picker; main rebuilds the fonts (a CJK language
+    // needs a second font merged in) and saves the choice.
+    bool language_changed = false;
+    // A system CJK font for the current language, or empty. The launcher's
+    // own strings never need it (a subset is compiled in); it is for what
+    // friends type.
+    std::string cjk_font;
+    // Applies config.language (or the system's) to the string table and
+    // says which CJK font, if any, the fonts need. Called by main at start
+    // and after a change.
+    void ApplyLanguage();
     Tab tab = Tab::Home;
 
     // "We know who the player is" — the cached identity counts, so a saved

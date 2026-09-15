@@ -38,9 +38,9 @@ void DrawLink(App& app, const Link& link) {
     ImGui::Text("%s", link.label);
     ImGui::PopFont();
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("%s", link.blurb);
+    ImGui::TextDisabled("%s", T(link.blurb));
     ImGui::PopTextWrapPos();
-    if (ImGui::Button("Open", ImVec2(90.0f, 0.0f))) SDL_OpenURL(link.url);
+    if (ImGui::Button(T("Open"), ImVec2(90.0f, 0.0f))) SDL_OpenURL(link.url);
     ImGui::SameLine();
     ImGui::TextDisabled("%s", link.url);
     ImGui::EndChild();
@@ -50,26 +50,23 @@ void DrawLink(App& app, const Link& link) {
 }  // namespace
 
 void DrawSupport(App& app) {
-    xlive::theme::PageHeader("Support XenonLive");
+    xlive::theme::PageHeader(T("Support XenonLive"));
     ImGui::PushTextWrapPos(0.0f);
     ImGui::TextUnformatted(
-        "XenonLive is a spare-time project by one developer, built with AI assistance: the ports, "
-        "this launcher, the overlay, and the server that keeps your friends, invitations, messages "
-        "and achievements. Running that server costs money every month, and the rest costs "
-        "evenings. If it has given you something, here is how to give a little back.");
+        T("XenonLive is a spare-time project by one developer, built with AI assistance: the ports, this launcher, the overlay, and the server that keeps your friends, invitations, messages and achievements. Running that server costs money every month, and the rest costs evenings. If it has given you something, here is how to give a little back."));
     ImGui::PopTextWrapPos();
 
-    xlive::theme::Section("Sponsor");
+    xlive::theme::Section(T("Sponsor"));
     for (const Link& link : kSponsor) DrawLink(app, link);
 
-    xlive::theme::Section("Contribute");
+    xlive::theme::Section(T("Contribute"));
     ImGui::PushTextWrapPos(0.0f);
-    ImGui::TextDisabled("A clear bug report is a contribution. So is a fix.");
+    ImGui::TextDisabled(T("A clear bug report is a contribution. So is a fix."));
     ImGui::PopTextWrapPos();
     for (const Link& link : kContribute) DrawLink(app, link);
 
     ImGui::Spacing();
-    ImGui::TextDisabled("Thank you for playing.");
+    ImGui::TextDisabled(T("Thank you for playing."));
 }
 
 }  // namespace launcher

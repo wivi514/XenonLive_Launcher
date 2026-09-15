@@ -39,9 +39,9 @@ std::string When(const std::string& rfc3339) {
 
 std::string Size(std::uintmax_t bytes) {
     char buf[32];
-    if (bytes >= 1024 * 1024) std::snprintf(buf, sizeof(buf), "%.1f MiB", double(bytes) / (1024.0 * 1024.0));
-    else if (bytes >= 1024) std::snprintf(buf, sizeof(buf), "%.0f KiB", double(bytes) / 1024.0);
-    else std::snprintf(buf, sizeof(buf), "%ju B", bytes);
+    if (bytes >= 1024 * 1024) std::snprintf(buf, sizeof(buf), T("%.1f MiB"), double(bytes) / (1024.0 * 1024.0));
+    else if (bytes >= 1024) std::snprintf(buf, sizeof(buf), T("%.0f KiB"), double(bytes) / 1024.0);
+    else std::snprintf(buf, sizeof(buf), T("%ju B"), bytes);
     return buf;
 }
 
@@ -110,20 +110,20 @@ void DrawCaptureDetail(App& app, const Capture& c) {
     ImGui::PopFont();
     if (!c.problem.empty()) {
         // Not a capture the launcher can read: no form, just the way out.
-        ImGui::TextColored(kRed, "This capture is broken");
+        ImGui::TextColored(kRed, T("This capture is broken"));
         ImGui::TextWrapped("%s", c.problem.c_str());
-        ImGui::TextWrapped("It cannot be sent. Delete it, or capture again in the game.");
+        ImGui::TextWrapped(T("It cannot be sent. Delete it, or capture again in the game."));
         ImGui::TextDisabled("%s", c.dir.string().c_str());
         ImGui::Spacing();
         ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kRed);
-        if (ImGui::Button("Delete it", ImVec2(220.0f, 0.0f))) app.DeleteCapture();
+        if (ImGui::Button(T("Delete it"), ImVec2(220.0f, 0.0f))) app.DeleteCapture();
         ImGui::PopStyleColor(2);
         return;
     }
-    ImGui::TextDisabled("%s%scaptured %s%s%s", c.game_version.c_str(),
+    ImGui::TextDisabled(T("%s%scaptured %s%s%s"), c.game_version.c_str(),
                         c.game_version.empty() ? "" : "   ", When(c.captured_at).c_str(),
-                        c.trigger.empty() ? "" : " with ", c.trigger.c_str());
+                        c.trigger.empty() ? "" : T(" with "), c.trigger.c_str());
     ImGui::Spacing();
 
     // The screenshot, if there is one, at most 340 wide.
@@ -140,7 +140,7 @@ void DrawCaptureDetail(App& app, const Capture& c) {
 
     // What goes with it. The player sees every file and every fact
     // before deciding.
-    ImGui::TextUnformatted("What will be sent with your words");
+    ImGui::TextUnformatted(T("What will be sent with your words"));
     ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
     for (const CaptureFile& f : c.files) {
         ImGui::Bullet();
@@ -150,7 +150,7 @@ void DrawCaptureDetail(App& app, const Capture& c) {
                                f.what.empty() ? "" : " - ", f.what.c_str());
         } else {
             ImGui::PopStyleColor();
-            ImGui::TextWrapped("%s - missing", f.name.c_str());
+            ImGui::TextWrapped(T("%s - missing"), f.name.c_str());
             ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
         }
     }
@@ -162,39 +162,37 @@ void DrawCaptureDetail(App& app, const Capture& c) {
         }
         ImGui::Bullet();
         ImGui::SameLine();
-        ImGui::TextWrapped("your machine: %s", line.c_str());
+        ImGui::TextWrapped(T("your machine: %s"), line.c_str());
     }
-    ImGui::TextWrapped("Only the developer sees the files and your machine. Everyone can read the "
-                       "title, what happened and how to reproduce, so the next person with the same "
-                       "bug finds yours.");
+    ImGui::TextWrapped(T("Only the developer sees the files and your machine. Everyone can read the title, what happened and how to reproduce, so the next person with the same bug finds yours."));
     ImGui::PopStyleColor();
     ImGui::Spacing();
 
     ImGui::BeginDisabled(busy);
-    ImGui::TextUnformatted("Title");
+    ImGui::TextUnformatted(T("Title"));
     ImGui::SetNextItemWidth(-1.0f);
-    ImGui::InputTextWithHint("##title", "one line: what is wrong", st.title, sizeof(st.title));
-    ImGui::TextUnformatted("What happened");
+    ImGui::InputTextWithHint("##title", T("one line: what is wrong"), st.title, sizeof(st.title));
+    ImGui::TextUnformatted(T("What happened"));
     ImGui::InputTextMultiline("##summary", st.summary, sizeof(st.summary),
                               ImVec2(-1.0f, ImGui::GetTextLineHeight() * 5.0f));
-    ImGui::TextUnformatted("How to make it happen again");
+    ImGui::TextUnformatted(T("How to make it happen again"));
     ImGui::SameLine();
-    ImGui::TextColored(kMuted, "if you know");
+    ImGui::TextColored(kMuted, T("if you know"));
     ImGui::InputTextMultiline("##steps", st.steps, sizeof(st.steps),
                               ImVec2(-1.0f, ImGui::GetTextLineHeight() * 4.0f));
     ImGui::Spacing();
-    if (ImGui::Button("Send to the developer", ImVec2(220.0f, 0.0f))) app.SendCapture();
+    if (ImGui::Button(T("Send to the developer"), ImVec2(220.0f, 0.0f))) app.SendCapture();
     ImGui::EndDisabled();
     ImGui::SameLine();
     ImGui::BeginDisabled(busy);
     ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kRed);
-    if (ImGui::Button("Delete, it was nothing", ImVec2(220.0f, 0.0f))) app.DeleteCapture();
+    if (ImGui::Button(T("Delete, it was nothing"), ImVec2(220.0f, 0.0f))) app.DeleteCapture();
     ImGui::PopStyleColor(2);
     ImGui::EndDisabled();
     if (busy) {
         ImGui::SameLine();
-        ImGui::TextDisabled("Sending...");
+        ImGui::TextDisabled(T("Sending..."));
     } else if (!st.error.empty()) {
         ImGui::TextColored(kRed, "%s", st.error.c_str());
     }
@@ -212,15 +210,15 @@ void DrawDeveloperDetail(App& app, const Issue& is) {
 
     // Who and on what.
     ImGui::Spacing();
-    xlive::theme::Section("Reported by");
+    xlive::theme::Section(T("Reported by"));
     if (!loaded) {
         if (!st.detail_error.empty()) ImGui::TextColored(kRed, "%s", st.detail_error.c_str());
-        else ImGui::TextDisabled("Loading...");
+        else ImGui::TextDisabled(T("Loading..."));
         return;
     }
     ImGui::TextUnformatted(full.gamertag.c_str());
     ImGui::SameLine();
-    ImGui::TextDisabled("captured %s", full.captured_at.empty() ? "?" : When(full.captured_at).c_str());
+    ImGui::TextDisabled(T("captured %s"), full.captured_at.empty() ? "?" : When(full.captured_at).c_str());
     if (!full.system_json.empty()) {
         auto parsed = xlive::json::Parse(full.system_json);
         if (parsed.ok && parsed.value.is_object()) {
@@ -238,7 +236,7 @@ void DrawDeveloperDetail(App& app, const Issue& is) {
 
     // The capture.
     ImGui::Spacing();
-    xlive::theme::Section("Capture");
+    xlive::theme::Section(T("Capture"));
     std::error_code ec;
     size_t on_disk = 0;
     std::uintmax_t total = 0;
@@ -251,9 +249,9 @@ void DrawDeveloperDetail(App& app, const Issue& is) {
         ImGui::Bullet();
         ImGui::SameLine();
         if (here) ImGui::TextWrapped("%s (%s)", f.name.c_str(), Size(f.size).c_str());
-        else ImGui::TextDisabled("%s (%s) - not fetched", f.name.c_str(), Size(f.size).c_str());
+        else ImGui::TextDisabled(T("%s (%s) - not fetched"), f.name.c_str(), Size(f.size).c_str());
     }
-    if (full.files.empty()) ImGui::TextDisabled("no files");
+    if (full.files.empty()) ImGui::TextDisabled(T("no files"));
     if (!shot.empty()) {
         const Image img = app.images.Local(shot);
         if (img.texture) {
@@ -265,16 +263,16 @@ void DrawDeveloperDetail(App& app, const Issue& is) {
     const bool fetching = st.download_ticket != 0 && st.downloading == full.id;
     ImGui::BeginDisabled(fetching || full.files.empty());
     char label[96];
-    std::snprintf(label, sizeof(label), on_disk == full.files.size() ? "Fetch again (%s)" : "Fetch the capture (%s)",
+    std::snprintf(label, sizeof(label), on_disk == full.files.size() ? T("Fetch again (%s)") : T("Fetch the capture (%s)"),
                   Size(total).c_str());
     if (ImGui::Button(label, ImVec2(240.0f, 0.0f))) app.DevDownload(full);
     ImGui::EndDisabled();
     if (fetching) {
         ImGui::SameLine();
-        ImGui::TextDisabled("Fetching, %zu to go...", st.download_queue.size() + 1);
+        ImGui::TextDisabled(T("Fetching, %zu to go..."), st.download_queue.size() + 1);
     } else if (on_disk > 0) {
         ImGui::SameLine();
-        if (xlive::theme::SmallSecondaryButton("Open folder")) OpenFolder(dir.string());
+        if (xlive::theme::SmallSecondaryButton(T("Open folder"))) OpenFolder(dir.string());
     }
     if (!st.download_error.empty() && st.downloading == 0) {
         ImGui::TextColored(kRed, "%s", st.download_error.c_str());
@@ -283,7 +281,7 @@ void DrawDeveloperDetail(App& app, const Issue& is) {
 
     // The state.
     ImGui::Spacing();
-    xlive::theme::Section("State");
+    xlive::theme::Section(T("State"));
     ImGui::BeginDisabled(st.state_ticket != 0);
     for (const char* state : {"open", "fixed", "closed"}) {
         const bool current = full.state == state;
@@ -299,7 +297,7 @@ void DrawDeveloperDetail(App& app, const Issue& is) {
     ImGui::BeginDisabled(st.delete_ticket != 0);
     ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
     ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kRed);
-    if (ImGui::Button("Delete this report")) app.DevDeleteReport(full.id);
+    if (ImGui::Button(T("Delete this report"))) app.DevDeleteReport(full.id);
     ImGui::PopStyleColor(2);
     ImGui::EndDisabled();
 }
@@ -311,13 +309,13 @@ void DrawReportDetail(App& app, const Issue& is) {
     ImGui::TextColored(StateColour(is.state), "%s", is.state.c_str());
     ImGui::SameLine();
     ImGui::TextDisabled("%s %s", GameName(app, is.title_id, "").c_str(), is.game_version.c_str());
-    ImGui::TextDisabled("reported %s%s", When(is.created_at).c_str(), is.mine ? " by you" : "");
+    ImGui::TextDisabled(T("reported %s%s"), When(is.created_at).c_str(), is.mine ? T(" by you") : "");
     ImGui::Spacing();
-    xlive::theme::Section("What happened");
+    xlive::theme::Section(T("What happened"));
     ImGui::TextWrapped("%s", is.summary.c_str());
     ImGui::Spacing();
-    xlive::theme::Section("How to make it happen again");
-    if (is.steps.empty()) ImGui::TextDisabled("not given");
+    xlive::theme::Section(T("How to make it happen again"));
+    if (is.steps.empty()) ImGui::TextDisabled(T("not given"));
     else ImGui::TextWrapped("%s", is.steps.c_str());
     if (app.developer()) {
         DrawDeveloperDetail(app, is);
@@ -328,7 +326,7 @@ void DrawReportDetail(App& app, const Issue& is) {
         ImGui::BeginDisabled(app.issues.delete_ticket != 0);
         ImGui::PushStyleColor(ImGuiCol_Button, kPanelHi);
         ImGui::PushStyleColor(ImGuiCol_ButtonHovered, kRed);
-        if (ImGui::Button("Delete my report")) app.DeleteReport(is.id);
+        if (ImGui::Button(T("Delete my report"))) app.DeleteReport(is.id);
         ImGui::PopStyleColor(2);
         ImGui::EndDisabled();
     }
@@ -338,7 +336,7 @@ void DrawReportDetail(App& app, const Issue& is) {
 
 void DrawIssues(App& app) {
     auto& st = app.issues;
-    if (xlive::theme::PageHeader("Issues", "bug reports", "Rescan")) app.RescanCaptures();
+    if (xlive::theme::PageHeader(T("Issues"), T("bug reports"), T("Rescan"))) app.RescanCaptures();
     // Opened by a hook rather than the blade, or opened before the client
     // was online: the first search still happens.
     if (!st.searched && st.search_ticket == 0 && app.client && app.client->online()) {
@@ -351,18 +349,17 @@ void DrawIssues(App& app) {
     ImGui::PopStyleColor();
 
     ImGui::PushFont(app.fonts.heading);
-    ImGui::TextColored(kLime, "Your captures");
+    ImGui::TextColored(kLime, T("Your captures"));
     ImGui::PopFont();
     if (st.captures.empty()) {
-        ImGui::TextDisabled("none");
+        ImGui::TextDisabled(T("none"));
         ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-        ImGui::TextWrapped("Press the capture key in the game when something goes wrong. It "
-                           "shows up here for you to describe and send, or delete.");
+        ImGui::TextWrapped(T("Press the capture key in the game when something goes wrong. It shows up here for you to describe and send, or delete."));
         ImGui::PopStyleColor();
     }
     for (size_t i = 0; i < st.captures.size(); ++i) {
         const Capture& c = st.captures[i];
-        const std::string sub = When(c.captured_at) + (c.problem.empty() ? "" : "  (broken)");
+        const std::string sub = When(c.captured_at) + (c.problem.empty() ? "" : T("  (broken)"));
         const ImVec4 mark = c.problem.empty() ? kAmber : kRed;
         const std::string heading =
             c.title_id || !c.game.empty() ? GameName(app, c.title_id, c.game) : c.id;
@@ -373,16 +370,16 @@ void DrawIssues(App& app) {
 
     ImGui::Dummy(ImVec2(0.0f, 8.0f));
     ImGui::PushFont(app.fonts.heading);
-    ImGui::TextColored(kLime, "Reported");
+    ImGui::TextColored(kLime, T("Reported"));
     ImGui::PopFont();
     ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-    ImGui::TextWrapped(app.developer() ? "Every report, newest first. Words search instead."
-                                       : "Search before you send: yours may be known.");
+    ImGui::TextWrapped(app.developer() ? T("Every report, newest first. Words search instead.")
+                                       : T("Search before you send: yours may be known."));
     ImGui::PopStyleColor();
     // Which game. The launcher's own titles are the choices; a report about
-    // a game not installed here still shows under "All games".
+    // a game not installed here still shows under T("All games").
     {
-        std::string current = "All games";
+        std::string current = T("All games");
         for (const auto& t : app.config.titles) {
             if (t.title_id == st.title_filter && st.title_filter != 0) current = t.name;
         }
@@ -395,7 +392,7 @@ void DrawIssues(App& app) {
                 if (st.search_ticket == 0) app.SearchIssues();
                 else st.refresh_after_search = true;
             };
-            if (ImGui::Selectable("All games", st.title_filter == 0)) pick(0);
+            if (ImGui::Selectable(T("All games"), st.title_filter == 0)) pick(0);
             for (const auto& t : app.config.titles) {
                 if (t.title_id == 0) continue;
                 if (ImGui::Selectable(t.name.c_str(), st.title_filter == t.title_id)) pick(t.title_id);
@@ -422,23 +419,23 @@ void DrawIssues(App& app) {
         ImGui::NewLine();
     }
     ImGui::SetNextItemWidth(-1.0f);
-    const bool go = ImGui::InputTextWithHint("##q", "words to look for", st.query, sizeof(st.query),
+    const bool go = ImGui::InputTextWithHint("##q", T("words to look for"), st.query, sizeof(st.query),
                                              ImGuiInputTextFlags_EnterReturnsTrue);
     if (go || (st.searched && st.search_ticket == 0 && st.searched_for != st.query &&
                ImGui::IsItemDeactivatedAfterEdit())) {
         app.SearchIssues();
     }
     if (st.search_ticket != 0) {
-        ImGui::TextDisabled("Searching...");
+        ImGui::TextDisabled(T("Searching..."));
     } else if (!st.search_error.empty()) {
         ImGui::TextColored(kRed, "%s", st.search_error.c_str());
     } else if (st.searched && st.results.empty()) {
-        ImGui::TextDisabled(st.searched_for.empty() ? "nothing reported yet" : "nothing matches");
+        ImGui::TextDisabled(st.searched_for.empty() ? T("nothing reported yet") : T("nothing matches"));
     }
     for (size_t i = 0; i < st.results.size(); ++i) {
         const Issue& is = st.results[i];
         const std::string sub = is.state + "   " + When(is.created_at).substr(0, 10) +
-                                (is.mine ? "   yours" : "") +
+                                (is.mine ? T("   yours") : "") +
                                 (is.gamertag.empty() ? "" : "   " + is.gamertag);
         char id[32];
         std::snprintf(id, sizeof(id), "r%lld", static_cast<long long>(is.id));
@@ -461,16 +458,12 @@ void DrawIssues(App& app) {
         DrawReportDetail(app, st.results[size_t(st.selected_report)]);
     } else {
         ImGui::PushFont(app.fonts.heading);
-        ImGui::TextColored(kLime, "Bug reports");
+        ImGui::TextColored(kLime, T("Bug reports"));
         ImGui::PopFont();
         ImGui::PushStyleColor(ImGuiCol_Text, kMuted);
-        ImGui::TextWrapped("When something goes wrong in a game, press its capture key: it saves a "
-                           "screenshot, the log from the last minute and what your machine is, and "
-                           "the capture appears on the left. Pick it, say what happened and how to "
-                           "make it happen again, and send it - or delete it if it was nothing.");
+        ImGui::TextWrapped(T("When something goes wrong in a game, press its capture key: it saves a screenshot, the log from the last minute and what your machine is, and the capture appears on the left. Pick it, say what happened and how to make it happen again, and send it - or delete it if it was nothing."));
         ImGui::Spacing();
-        ImGui::TextWrapped("Everyone can read the words of every report and search them. Only the "
-                           "developer sees the screenshot, the log and your machine.");
+        ImGui::TextWrapped(T("Everyone can read the words of every report and search them. Only the developer sees the screenshot, the log and your machine."));
         ImGui::PopStyleColor();
     }
     ImGui::EndChild();

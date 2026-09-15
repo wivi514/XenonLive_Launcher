@@ -88,7 +88,7 @@ bool App::Init(std::string& error) {
     accounts.Open(DataDir() / "launcher", DataDir() / "session.json");
     StartClient();
     if (!client) {
-        error = "the XenonLive client could not start";
+        error = T("the XenonLive client could not start");
         return false;
     }
     return true;
@@ -150,7 +150,7 @@ void App::RestartClient() {
 
 void App::SaveConfigOrToast() {
     std::string error;
-    if (!SaveConfig(config, error)) toasts.Push("Could not save launcher.json: " + error);
+    if (!SaveConfig(config, error)) toasts.Push(T("Could not save launcher.json: ") + error);
 }
 
 // -- saved accounts -----------------------------------------------------------
@@ -158,17 +158,17 @@ void App::SaveConfigOrToast() {
 bool App::SwitchAccount(uint64_t xuid, std::string& error) {
     const SavedAccount* chosen = accounts.Find(xuid);
     if (!chosen || !chosen->has_tokens()) {
-        error = "that account needs its password again";
+        error = T("that account needs its password again");
         return false;
     }
     if (game.running()) {
-        error = "quit the running game first: it holds the current account's session";
+        error = T("quit the running game first: it holds the current account's session");
         return false;
     }
     // The current account's latest tokens, before its file is replaced.
     if (client && signed_in() && signin.ticket == 0) accounts.Sync(client->identity().xuid);
     if (!accounts.WriteSession(*chosen)) {
-        error = "could not write session.json";
+        error = T("could not write session.json");
         return false;
     }
     if (!chosen->server.empty() && chosen->server != config.server) {
@@ -207,7 +207,7 @@ std::string App::gamertag() const {
 
 std::string App::TitleName(uint32_t title_id) const {
     if (const TitleEntry* entry = config.FindTitle(title_id)) return entry->name;
-    return "title " + TitleIdHex(title_id);
+    return T("title ") + TitleIdHex(title_id);
 }
 
 // -- tickets ------------------------------------------------------------------
@@ -227,7 +227,7 @@ void App::PollPending() {
             continue;
         }
         if (status == xlive::Client::OpStatus::Failed) {
-            toasts.Push(pending_[i].what + " failed: " + result.error);
+            toasts.Push(pending_[i].what + T(" failed: ") + result.error);
         } else if (status == xlive::Client::OpStatus::Unknown) {
             // Our bookkeeping, not the server's refusal. Say so, quietly.
             std::fprintf(stderr, "[launcher] ticket for '%s' vanished\n",
@@ -353,10 +353,10 @@ void App::PollPending() {
                 }
                 RefreshInbox();
             } else {
-                const std::string why = result.error == "too_long" ? "it is over 256 characters"
-                                        : result.error == "not_friends" ? "you are not friends"
+                const std::string why = result.error == "too_long" ? T("it is over 256 characters")
+                                        : result.error == "not_friends" ? T("you are not friends")
                                         : result.error;
-                toasts.Push("Message not sent: " + why, 6.0);
+                toasts.Push(T("Message not sent: ") + why, 6.0);
             }
         }
     }
@@ -377,14 +377,14 @@ void App::PollPending() {
             error = result.error.empty() ? "unknown" : result.error;
         }
     };
-    collect(account.email_ticket, account.email_error, "Recovery email saved", [&] {
+    collect(account.email_ticket, account.email_error, T("Recovery email saved"), [&] {
         account.email_filled = false;
     });
-    collect(account.country_ticket, account.country_error, "Country saved", [&] {
+    collect(account.country_ticket, account.country_error, T("Country saved"), [&] {
         account.country_filled = false;
     });
     collect(account.password_ticket, account.password_error,
-            "Password changed; every other device is signed out", [&] {
+            T("Password changed; every other device is signed out"), [&] {
                 std::memset(account.current, 0, sizeof(account.current));
                 std::memset(account.next, 0, sizeof(account.next));
                 std::memset(account.confirm, 0, sizeof(account.confirm));
@@ -411,7 +411,7 @@ void App::PollPending() {
                 issues.error.clear();
                 issues.selected_capture = -1;
                 RescanCaptures();
-                toasts.Push("Bug report sent: " + result.issue.title, 6.0);
+                toasts.Push(T("Bug report sent: ") + result.issue.title, 6.0);
                 // The report joins the list on the left. A search still
                 // running would overwrite it, so that one is redone.
                 if (issues.search_ticket == 0) {
@@ -422,14 +422,14 @@ void App::PollPending() {
                 }
             } else {
                 std::string why = result.error;
-                if (result.error == "too_many_reports") why = "at most 10 reports a day";
-                else if (result.error == "unreadable_file") why = "could not read " + result.failed_file;
+                if (result.error == "too_many_reports") why = T("at most 10 reports a day");
+                else if (result.error == "unreadable_file") why = T("could not read ") + result.failed_file;
                 else if (result.error == "too_large" || result.error == "report_too_big") {
-                    why = result.failed_file + " is too big (4 MiB a file, 8 MiB a report)";
+                    why = result.failed_file + T(" is too big (4 MiB a file, 8 MiB a report)");
                 } else if (result.error == "not_text_or_image") {
-                    why = result.failed_file + " is neither an image nor text";
+                    why = result.failed_file + T(" is neither an image nor text");
                 }
-                issues.error = "Not sent: " + why;
+                issues.error = T("Not sent: ") + why;
             }
             issues.sending.clear();
         }
@@ -459,11 +459,11 @@ void App::PollPending() {
         if (status != xlive::Client::OpStatus::Pending) {
             issues.delete_ticket = 0;
             if (status == xlive::Client::OpStatus::Succeeded) {
-                toasts.Push("Report deleted", 4.0);
+                toasts.Push(T("Report deleted"), 4.0);
                 issues.detail_for = 0;
                 SearchIssues();
             } else {
-                toasts.Push("Could not delete the report: " + result.error, 6.0);
+                toasts.Push(T("Could not delete the report: ") + result.error, 6.0);
             }
         }
     }
@@ -478,7 +478,7 @@ void App::PollPending() {
                 issues.detail_error.clear();
             } else {
                 issues.detail_error = result.error == "not_developer"
-                                          ? "This account is no longer a developer"
+                                          ? T("This account is no longer a developer")
                                           : result.error;
             }
         }
@@ -503,7 +503,7 @@ void App::PollPending() {
                     issues.detail_for = keep;
                 }
             } else {
-                toasts.Push("Could not change the state: " + result.error, 6.0);
+                toasts.Push(T("Could not change the state: ") + result.error, 6.0);
                 if (issues.detail_for != 0) DevOpenReport(issues.detail_for);
             }
         }
@@ -525,7 +525,7 @@ void App::PollPending() {
                     issues.downloading = 0;
                 }
             } else {
-                issues.download_error = "Could not fetch " + result.failed_file + ": " + result.error;
+                issues.download_error = T("Could not fetch ") + result.failed_file + ": " + result.error;
                 issues.download_queue.clear();
                 issues.downloading = 0;
             }
@@ -544,7 +544,7 @@ void App::PollPending() {
                 // where the password went; the player signs in with it.
                 signin.error.clear();
                 signin.mode = SignInState::Mode::SignIn;
-                signin.sent_to = result.detail.empty() ? "your email" : result.detail;
+                signin.sent_to = result.detail.empty() ? T("your email") : result.detail;
                 std::memset(signin.password, 0, sizeof(signin.password));
             } else {
                 // Signed in or registered.
@@ -639,6 +639,18 @@ int App::unread_messages() const {
     return n;
 }
 
+// -- language -------------------------------------------------------------------
+
+void App::ApplyLanguage() {
+    namespace i18n = xlive::i18n;
+    i18n::Lang lang = config.language.empty() ? i18n::FromSystem() : i18n::FromCode(config.language);
+    // The launcher's own words come from the compiled-in subset; a system
+    // CJK font, when there is one, covers what friends type.
+    cjk_font = i18n::Info(lang).cjk ? i18n::FindCjkFont(lang) : std::string();
+    if (!cjk_font.empty()) std::fprintf(stderr, "[launcher] system CJK font: %s\n", cjk_font.c_str());
+    i18n::Set(lang);
+}
+
 // -- the account screen --------------------------------------------------------
 
 void App::OpenAccount() {
@@ -725,7 +737,7 @@ void App::SendCapture() {
     }
     const Capture& c = issues.captures[size_t(issues.selected_capture)];
     if (!c.problem.empty()) {
-        issues.error = "This capture cannot be sent: " + c.problem;
+        issues.error = T("This capture cannot be sent: ") + c.problem;
         return;
     }
     xlive::Client::IssueDraft draft;
@@ -742,11 +754,11 @@ void App::SendCapture() {
         return s.find_first_not_of(" \t\r\n") == std::string::npos;
     };
     if (blank(draft.title)) {
-        issues.error = "Give it a title.";
+        issues.error = T("Give it a title.");
         return;
     }
     if (blank(draft.summary)) {
-        issues.error = "Say what happened.";
+        issues.error = T("Say what happened.");
         return;
     }
     issues.error.clear();
@@ -879,7 +891,7 @@ void App::DevDownload(const xlive::Client::Issue& is) {
 
 void App::AcceptInvite(const xlive::Client::Invite& invite) {
     if (!client) return;
-    Issue(client->AcceptInvite(invite.id), "Accept invite");
+    Issue(client->AcceptInvite(invite.id), T("Accept invite"));
 
     // If the game is already running, the server pushes "invite_taken" to
     // it, the library raises InviteAccepted, and the port posts the
@@ -893,45 +905,44 @@ void App::AcceptInvite(const xlive::Client::Invite& invite) {
     const std::string title = TitleName(invite.title_id);
     if (game.running()) {
         if (running_title == index) {
-            toasts.Push("Accepted. " + title + " has been told; it joins from there.");
+            toasts.Push(T("Accepted. ") + title + T(" has been told; it joins from there."));
         } else {
-            toasts.Push("Accepted, but a different title is running. Quit it and press "
-                        "Play on " + title + " to join.", 8.0);
+            toasts.Push(T("Accepted, but a different title is running. Quit it and press Play on ") + title + T(" to join."), 8.0);
         }
         return;
     }
     if (index < 0) {
-        toasts.Push("Accepted " + invite.from_gamertag + "'s invitation. Add " + title +
-                    " on the Home tab to launch it.");
+        toasts.Push(T("Accepted ") + invite.from_gamertag + T("'s invitation. Add ") + title +
+                    T(" on the Home tab to launch it."));
         return;
     }
     std::string error;
     if (Launch(index, error)) {
-        toasts.Push("Launching " + title + " to join " + invite.from_gamertag);
+        toasts.Push(T("Launching ") + title + T(" to join ") + invite.from_gamertag);
     } else {
-        toasts.Push("Could not launch " + title + ": " + error, 8.0);
+        toasts.Push(T("Could not launch ") + title + ": " + error, 8.0);
     }
 }
 
 void App::DeclineInvite(uint64_t invite_id) {
     if (!client) return;
-    Issue(client->DeclineInvite(invite_id), "Decline invite");
+    Issue(client->DeclineInvite(invite_id), T("Decline invite"));
 }
 
 // -- the game -----------------------------------------------------------------
 
 bool App::Launch(int title_index, std::string& error) {
     if (title_index < 0 || title_index >= int(config.titles.size())) {
-        error = "no such title";
+        error = T("no such title");
         return false;
     }
     if (game.running()) {
-        error = config.titles[size_t(running_title)].name + " is already running";
+        error = config.titles[size_t(running_title)].name + T(" is already running");
         return false;
     }
     const TitleEntry& entry = config.titles[size_t(title_index)];
     if (entry.exe.empty()) {
-        error = "no executable configured";
+        error = T("no executable configured");
         return false;
     }
     std::map<std::string, std::string> env = entry.env;
@@ -957,13 +968,13 @@ void App::PollGame() {
     const std::string name =
         running_title >= 0 && running_title < int(config.titles.size())
             ? config.titles[size_t(running_title)].name
-            : "The game";
+            : T("The game");
     if (game.exited_abnormally()) {
-        toasts.Push(name + " stopped on signal " + std::to_string(game.exit_code()), 8.0);
+        toasts.Push(name + T(" stopped on signal ") + std::to_string(game.exit_code()), 8.0);
     } else if (game.exit_code() != 0) {
-        toasts.Push(name + " exited with code " + std::to_string(game.exit_code()), 8.0);
+        toasts.Push(name + T(" exited with code ") + std::to_string(game.exit_code()), 8.0);
     } else {
-        toasts.Push(name + " exited");
+        toasts.Push(name + T(" exited"));
     }
     running_title = -1;
 }
@@ -991,7 +1002,7 @@ void App::QueueInstallJob(const std::string& key, bool install) {
 void App::InstallGame(const CatalogGame& item) {
     if (running_title >= 0 && game.running() &&
         config.titles[size_t(running_title)].key == item.key) {
-        toasts.Push(std::string(item.name) + " is running; quit it before updating");
+        toasts.Push(std::string(item.name) + T(" is running; quit it before updating"));
         return;
     }
     install_errors.erase(item.key);
@@ -1037,7 +1048,7 @@ void App::UpdateLauncher() {
         return;
     }
     if (game.running()) {
-        launcher_update_error = "a game is running; quit it first, the launcher restarts to update";
+        launcher_update_error = T("a game is running; quit it first, the launcher restarts to update");
         return;
     }
     launcher_update_error.clear();
@@ -1063,10 +1074,10 @@ std::string App::PackageState(const TitleEntry& entry) const {
             // The port seeds a PUT_YOUR_GAME_HERE.txt; the package itself is
             // the console's hash-named file with no extension.
             if (item.path().extension() == ".txt") continue;
-            return "package found";
+            return T("package found");
         }
     }
-    return "no package yet";
+    return T("no package yet");
 }
 
 void App::PollInstaller() {
@@ -1083,7 +1094,7 @@ void App::PollInstaller() {
         if (progress.key == LauncherSelf().key) {
             if (progress.phase == InstallPhase::Failed && current_job_.install) {
                 launcher_update_error = progress.message;
-                toasts.Push("Launcher update failed: " + progress.message, 8.0);
+                toasts.Push(T("Launcher update failed: ") + progress.message, 8.0);
             } else if (progress.phase == InstallPhase::Failed) {
                 // The launcher's own repository may not answer (private, no
                 // release yet): the log knows, the player is not bothered.
@@ -1098,7 +1109,7 @@ void App::PollInstaller() {
                     quit = true;
                 } else {
                     launcher_update_error = error;
-                    toasts.Push("Launcher update failed: " + error, 8.0);
+                    toasts.Push(T("Launcher update failed: ") + error, 8.0);
                 }
             } else {
                 release_check_error.clear();
@@ -1106,8 +1117,8 @@ void App::PollInstaller() {
                 const bool newer = BareVersion(progress.release.tag) != LauncherVersion();
                 launcher_update = newer ? progress.release.tag : std::string();
                 if (newer && announced_updates_.insert("launcher@" + progress.release.tag).second) {
-                    toasts.Push("XenonLive Launcher " + progress.release.tag +
-                                    " is available - update from Home",
+                    toasts.Push(T("XenonLive Launcher ") + progress.release.tag +
+                                    T(" is available - update from Home"),
                                 8.0);
                 }
             }
@@ -1131,7 +1142,7 @@ void App::PollInstaller() {
                 config.titles[size_t(installed_at)].version != progress.release.tag &&
                 announced_updates_.insert(std::string(item->key) + "@" + progress.release.tag).second) {
                 toasts.Push(std::string(item->name) + " " + progress.release.tag +
-                                " is available - update from Home",
+                                T(" is available - update from Home"),
                             8.0);
             }
             if (progress.installed) {
@@ -1156,7 +1167,7 @@ void App::PollInstaller() {
                 entry.env[std::string(item->prefix) + "_XLIVE_ONLINE"] = "1";
                 entry.env[std::string(item->prefix) + "_XLIVE_COOP"] = "1";
                 SaveConfigOrToast();
-                toasts.Push(std::string(item->name) + " " + progress.release.tag + " installed", 6.0);
+                toasts.Push(std::string(item->name) + " " + progress.release.tag + T(" installed"), 6.0);
             }
         }
         installer.Acknowledge();
@@ -1194,7 +1205,7 @@ void App::HandleEvent(const xlive::Event& event) {
     switch (event.kind) {
         case EventKind::SigninChanged:
             if (signed_in()) {
-                toasts.Push("Signed in as " + gamertag());
+                toasts.Push(T("Signed in as ") + gamertag());
                 last_xuid_ = client->identity().xuid;
                 // A friends tab opened before the identity was known asked
                 // about nobody; ask again now that there is someone.
@@ -1205,7 +1216,7 @@ void App::HandleEvent(const xlive::Event& event) {
                 // and loses the tokens either way.
                 if (last_xuid_ != 0) accounts.ClearTokens(last_xuid_);
                 last_xuid_ = 0;
-                toasts.Push("Signed out: " + client->status(), 6.0);
+                toasts.Push(T("Signed out: ") + client->status(), 6.0);
                 last_friends_.clear();
                 friends_baseline_ = false;
                 presence_news_.Reset();
@@ -1223,9 +1234,9 @@ void App::HandleEvent(const xlive::Event& event) {
 
         case EventKind::ConnectionChanged:
             if (client && client->online()) {
-                toasts.Push("Connected to " + config.server);
+                toasts.Push(T("Connected to ") + config.server);
             } else {
-                toasts.Push("Connection lost; retrying");
+                toasts.Push(T("Connection lost; retrying"));
             }
             break;
 
@@ -1244,9 +1255,9 @@ void App::HandleEvent(const xlive::Event& event) {
                     using R = xlive::Client::Relation;
                     if (f.relation == R::RequestReceived &&
                         (!was || was->relation != R::RequestReceived)) {
-                        toasts.Push(f.gamertag + " wants to be your friend");
+                        toasts.Push(f.gamertag + T(" wants to be your friend"));
                     } else if (f.relation == R::Friend && was && was->relation == R::RequestSent) {
-                        toasts.Push(f.gamertag + " accepted your friend request");
+                        toasts.Push(f.gamertag + T(" accepted your friend request"));
                     }
                 }
             }
@@ -1265,14 +1276,14 @@ void App::HandleEvent(const xlive::Event& event) {
             invite.from_gamertag = event.gamertag;
             invite.title_id = event.title_id;
             invite.session_id = event.session_id;
-            toasts.PushWithAction(event.gamertag + " invited you to " + TitleName(event.title_id),
-                                  "Accept", [this, invite] { AcceptInvite(invite); });
+            toasts.PushWithAction(event.gamertag + T(" invited you to ") + TitleName(event.title_id),
+                                  T("Accept"), [this, invite] { AcceptInvite(invite); });
             break;
         }
 
         case EventKind::InviteAnswered:
-            toasts.Push(event.gamertag + (event.accepted ? " accepted" : " declined") +
-                        " your invitation");
+            toasts.Push(event.gamertag + (event.accepted ? T(" accepted") : T(" declined")) +
+                        T(" your invitation"));
             break;
 
         case EventKind::MessageReceived: {
@@ -1288,7 +1299,7 @@ void App::HandleEvent(const xlive::Event& event) {
                 messages.unread[from] += 1;
             }
             RefreshInbox();
-            toasts.PushWithAction(who + ": " + event.message, "Reply",
+            toasts.PushWithAction(who + ": " + event.message, T("Reply"),
                                   [this, from, who] { OpenConversation(from, who); }, 8.0);
             break;
         }
@@ -1296,7 +1307,7 @@ void App::HandleEvent(const xlive::Event& event) {
         case EventKind::AchievementUnlocked:
             // Only a title client sees this; kept for the day the library
             // forwards it.
-            toasts.Push("Achievement unlocked: " + event.achievement_name);
+            toasts.Push(T("Achievement unlocked: ") + event.achievement_name);
             break;
 
         case EventKind::InviteAccepted:
@@ -1440,31 +1451,31 @@ void App::DrawRail() {
             }
         }
     };
-    blade("Home", Tab::Home, theme::Icon::Home);
-    blade("Friends", Tab::Friends, theme::Icon::Friends);
+    blade(T("Home"), Tab::Home, theme::Icon::Home);
+    blade(T("Friends"), Tab::Friends, theme::Icon::Friends);
     char unread[16] = {};
     if (unread_messages() > 0) std::snprintf(unread, sizeof(unread), "%d", unread_messages());
-    blade("Messages", Tab::Messages, theme::Icon::Messages, unread);
+    blade(T("Messages"), Tab::Messages, theme::Icon::Messages, unread);
     const size_t inbox = client ? client->invites().size() : 0;
     char badge[16] = {};
     if (inbox > 0) std::snprintf(badge, sizeof(badge), "%zu", inbox);
-    blade("Invites", Tab::Invites, theme::Icon::Invites, badge);
-    blade("Achievements", Tab::Achievements, theme::Icon::Achievements);
+    blade(T("Invites"), Tab::Invites, theme::Icon::Invites, badge);
+    blade(T("Achievements"), Tab::Achievements, theme::Icon::Achievements);
     // Captures waiting for a decision. Scanned once at start and whenever
     // the tab opens; a port writing one while the launcher sits open is
     // seen on the next open or Rescan.
     if (!issues.scanned) RescanCaptures();
     char waiting[16] = {};
     if (!issues.captures.empty()) std::snprintf(waiting, sizeof(waiting), "%zu", issues.captures.size());
-    blade("Issues", Tab::Issues, theme::Icon::Issues, waiting);
-    blade("Support", Tab::Support, theme::Icon::Support);
+    blade(T("Issues"), Tab::Issues, theme::Icon::Issues, waiting);
+    blade(T("Support"), Tab::Support, theme::Icon::Support);
 
     // The gamercard, at the bottom.
     const float card_h = fonts.heading->FontSize + ImGui::GetTextLineHeight() * 2.0f + 26.0f;
     ImGui::SetCursorPosY(ImGui::GetWindowHeight() - card_h - 14.0f);
     const bool online = client && client->online();
     if (theme::Gamercard(gamertag().c_str(), client ? client->identity().gamerscore : 0u, online,
-                         online ? "online" : "offline") &&
+                         online ? T("online") : T("offline")) &&
         signed_in()) {
         OpenAccount();
     }
