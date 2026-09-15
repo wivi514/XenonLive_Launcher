@@ -106,6 +106,11 @@ Fonts LoadFonts(ImGuiIO& io, float body_size, const char* override_path, const c
     const bool ko = cjk && std::string(cjk_lang) == "ko";
     if (cjk) {
         ImFontGlyphRangesBuilder builder;
+        // Everything the subset carries (the launcher's strings, the games'
+        // achievement words), plus the overrides a translator may have
+        // added since the font was generated — those fall to the system
+        // font below when the subset lacks them.
+        builder.AddText(notocjk::kSubsetChars);
         for (const std::string& text :
              xlive::i18n::AllTexts(ko ? xlive::i18n::Lang::Ko : xlive::i18n::Lang::Ja)) {
             builder.AddText(text.c_str());

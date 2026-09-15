@@ -373,6 +373,8 @@ void Overlay::Impl::Init(const VulkanHandles& h) {
         }
         if (!chosen) lang = i18n::FromSystem();
         i18n::Set(lang);
+        // The game's own words for its achievements, in this language.
+        if (client_for_init) client_for_init->SetLanguage(lang == i18n::Lang::En ? "" : i18n::Info(lang).code);
         const std::string cjk = i18n::Info(lang).cjk ? i18n::FindCjkFont(lang) : std::string();
         fonts = xlive::theme::LoadFonts(io, 20.0f, nullptr, cjk.empty() ? nullptr : cjk.c_str(),
                                         i18n::Info(lang).cjk ? i18n::Info(lang).code : nullptr);

@@ -274,6 +274,14 @@ refuses a translation whose `%` directives differ from the key's). Format
 strings keep their `%s`/`%d` in the same order in every language; where
 that cannot read well, the sentence is built from fragments instead.
 
+The achievements' names and descriptions are not in the table: they come
+from the server in the game's own language (`SetLanguage` on the client,
+`?lang=` on the title read; see XenonLive's `docs/importing-titles.md`).
+Their characters are in the compiled-in CJK subset through
+`thirdparty/notocjk/game_chars.txt`, written by `tools/gen_game_chars.py`
+from the ports' SPAs — run it and then `gen_cjk_font.py` when a game is
+added.
+
 Adding a language: a column in the TSV, a `Lang` and a line in `kLangs`
 in `common/i18n.cpp`, and — if it needs glyphs Selawik lacks — a run of
 `tools/gen_cjk_font.py`, which subsets Noto Sans CJK to the characters the

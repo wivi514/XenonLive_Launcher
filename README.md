@@ -97,7 +97,8 @@ Translations are one table, `common/strings.tsv` (one column per language,
 English as the key); a correction or a new language is a pull request
 against that file, and a draft can be tried without a rebuild by putting a
 `<code>.tsv` under `launcher/lang/` in the XenonLive data folder. The
-in-game overlay follows the launcher's language.
+in-game overlay follows the launcher's language, and the achievements are
+shown in the game's own words for it — the translations Capcom shipped.
 
 ## In the launcher
 

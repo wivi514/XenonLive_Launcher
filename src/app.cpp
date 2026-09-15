@@ -112,6 +112,9 @@ void App::StartClient() {
         std::lock_guard<std::mutex> lock(events_mutex_);
         events_.push_back(event);
     };
+    fresh->SetLanguage(xlive::i18n::Current() == xlive::i18n::Lang::En
+                           ? ""
+                           : xlive::i18n::Info(xlive::i18n::Current()).code);
     if (!fresh->Start(std::move(options))) {
         std::fprintf(stderr, "[launcher] xlive::Client::Start refused\n");
         return;
@@ -649,6 +652,13 @@ void App::ApplyLanguage() {
     cjk_font = i18n::Info(lang).cjk ? i18n::FindCjkFont(lang) : std::string();
     if (!cjk_font.empty()) std::fprintf(stderr, "[launcher] system CJK font: %s\n", cjk_font.c_str());
     i18n::Set(lang);
+    // The games' achievements come back in the game's own words for this
+    // language; what was already read is read again on the next open.
+    if (client) {
+        client->SetLanguage(lang == i18n::Lang::En ? "" : i18n::Info(lang).code);
+        achievements.loaded = false;
+        profile.compare_loaded = false;
+    }
 }
 
 // -- the account screen --------------------------------------------------------
