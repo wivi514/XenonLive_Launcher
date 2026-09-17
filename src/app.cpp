@@ -1035,6 +1035,35 @@ std::string BareVersion(std::string tag) {
     return tag;
 }
 
+// Whether GitHub's tag is NEWER than what this binary was built as, by
+// numbers ("1.0.10" after "1.0.9"), not merely different: a 1.0.1 built
+// before its release is tagged must not offer to "update" to 1.0.0.
+// Anything that does not parse as numbers compares as different-is-newer,
+// the old rule, so an odd tag still shows.
+bool NewerThanBuilt(const std::string& tag) {
+    const std::string built = LauncherVersion();
+    const auto parse = [](const std::string& v, std::vector<long>& out) {
+        std::string part;
+        for (char c : v + ".") {
+            if (c == '.') {
+                if (part.empty()) return false;
+                out.push_back(std::strtol(part.c_str(), nullptr, 10));
+                part.clear();
+            } else if (c >= '0' && c <= '9') {
+                part += c;
+            } else {
+                return false;
+            }
+        }
+        return !out.empty();
+    };
+    std::vector<long> a, b;
+    if (!parse(BareVersion(tag), a) || !parse(built, b)) return BareVersion(tag) != built;
+    a.resize(std::max(a.size(), b.size()), 0);
+    b.resize(a.size(), 0);
+    return a > b;
+}
+
 }  // namespace
 
 void App::CheckReleases() {
@@ -1126,7 +1155,7 @@ void App::PollInstaller() {
             } else {
                 release_check_error.clear();
                 release_pages[progress.key] = progress.release.html_url;
-                const bool newer = BareVersion(progress.release.tag) != LauncherVersion();
+                const bool newer = NewerThanBuilt(progress.release.tag);
                 launcher_update = newer ? progress.release.tag : std::string();
                 if (newer && announced_updates_.insert("launcher@" + progress.release.tag).second) {
                     toasts.Push(T("XenonLive Launcher ") + progress.release.tag +
