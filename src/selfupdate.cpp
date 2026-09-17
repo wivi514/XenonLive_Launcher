@@ -206,22 +206,43 @@ bool ApplySelfUpdate(const std::filesystem::path& staging, std::string& error) {
                 error = "cannot write " + script.string();
                 return false;
             }
+            // Waiting on the .exe itself, not on a PID: a rename of a running
+            // executable is refused until it exits, so "ren" succeeding IS
+            // the process being gone — no tasklist parsing, which matched a
+            // PID against the memory column and waited forever. xcopy
+            // rather than robocopy: every Windows has it and its exit code
+            // is plain. ping is the sleep; timeout refuses to run without
+            // a console, and this script has none.
+            const std::string exe = self.filename().string();
             out << "@echo off\r\n"
-                   "set tries=0\r\n"
+                   "setlocal\r\n"
+                   "set \"DIR=" << dir.string() << "\"\r\n"
+                   "set \"SRC=" << staging.string() << "\"\r\n"
+                   "set \"EXE=" << exe << "\"\r\n"
+                   "set /a tries=0\r\n"
                    ":wait\r\n"
-                   "tasklist /FI \"PID eq " << GetCurrentProcessId() << "\" 2>nul | find \""
-                << GetCurrentProcessId() << "\" >nul\r\n"
-                   "if not errorlevel 1 (\r\n"
-                   "  set /a tries+=1\r\n"
-                   "  if %tries% GEQ 60 exit /b 1\r\n"
-                   "  timeout /t 1 /nobreak >nul\r\n"
-                   "  goto wait\r\n"
-                   ")\r\n"
-                   "robocopy \"" << staging.string() << "\" \"" << dir.string()
-                << "\" /E /MOVE /R:5 /W:1 /NFL /NDL /NJH /NJS >nul\r\n"
-                   "rmdir /s /q \"" << staging.string() << "\" 2>nul\r\n"
-                   "start \"\" \"" << self.string() << "\"\r\n"
-                   "del \"%~f0\"\r\n";
+                   "ren \"%DIR%\\%EXE%\" \"%EXE%.old\" >nul 2>&1\r\n"
+                   "if not errorlevel 1 goto swap\r\n"
+                   "set /a tries+=1\r\n"
+                   "if %tries% GEQ 120 goto fail\r\n"
+                   "ping -n 2 127.0.0.1 >nul\r\n"
+                   "goto wait\r\n"
+                   ":swap\r\n"
+                   "xcopy \"%SRC%\" \"%DIR%\\\" /E /Y /I /Q /H >nul 2>&1\r\n"
+                   "if errorlevel 1 goto restore\r\n"
+                   "rmdir /s /q \"%SRC%\" >nul 2>&1\r\n"
+                   "del \"%DIR%\\%EXE%.old\" >nul 2>&1\r\n"
+                   "start \"\" \"%DIR%\\%EXE%\"\r\n"
+                   "del \"%~f0\"\r\n"
+                   "exit /b 0\r\n"
+                   ":restore\r\n"
+                   "del \"%DIR%\\%EXE%\" >nul 2>&1\r\n"
+                   "ren \"%DIR%\\%EXE%.old\" \"%EXE%\" >nul 2>&1\r\n"
+                   ":fail\r\n"
+                   "echo The update could not be applied (after %tries% waits). The old launcher was kept. > \"%DIR%\\xenonlive-update-failed.txt\"\r\n"
+                   "start \"\" \"%DIR%\\%EXE%\"\r\n"
+                   "del \"%~f0\"\r\n"
+                   "exit /b 1\r\n";
         }
         std::wstring command = L"cmd.exe /c \"" + script.wstring() + L"\"";
         STARTUPINFOW si{};

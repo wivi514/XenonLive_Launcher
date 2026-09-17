@@ -181,6 +181,18 @@ int main(int, char**) {
     const char* set_email = std::getenv("XENONLIVE_SET_EMAIL");
     // For a screenshot of the banner: pretend GitHub said this tag.
     if (const char* fake = std::getenv("XENONLIVE_FAKE_LAUNCHER_UPDATE")) app.launcher_update = fake;
+    // A self-update the swap script could not finish leaves a note beside
+    // the binary; say it once and take the note away.
+    {
+        std::error_code ec;
+        const auto note = launcher::SelfPath().parent_path() / "xenonlive-update-failed.txt";
+        if (std::filesystem::is_regular_file(note, ec)) {
+            app.toasts.Push(std::string(launcher::T("Launcher update failed: ")) +
+                                launcher::T("the files could not be swapped; the old version was kept"),
+                            12.0);
+            std::filesystem::remove(note, ec);
+        }
+    }
     if (std::getenv("XENONLIVE_APPLY_UPDATE")) {
         std::error_code ec;
         const auto staging = launcher::SelfUpdateStagingDir();
